@@ -52,5 +52,13 @@
     <string name="app_sync">Allow Syncing</string>
     <string name="app_never_sync">Never Synced</string>
     
+   	<string name="permission_label">Trello Access</string>
+    <string name="permission_desc">Let apps access your trello api keys</string>
+ 
+ <!--     Authenticator -->
+    <string name="label">OpenATK - Trello</string>
+    
+    <string name="trello_perm_desc">Let apps access your trello synced data</string>
+    <string name="trello_perm_label">Trello Access</string>
     
 </resources>

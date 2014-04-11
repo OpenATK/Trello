@@ -30,6 +30,7 @@ import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.google.gson.Gson;
+import com.openatk.trello.authenticator.TrelloMember;
 import com.openatk.trello.response.ActionResponse;
 import com.openatk.trello.response.BoardResponse;
 import com.openatk.trello.response.OrganizationResponse;
@@ -304,6 +305,56 @@ public class TrelloServerREST {
 		}
 		return newId; //TODO handle failure
 	}
+	
+	public boolean addUserToBoard(TrelloBoard theBoard, TrelloMember member){
+		Log.d("TrelloServerREST - addUserToBoard", "Called");
+		HttpClient client = new DefaultHttpClient();
+		
+		List<BasicNameValuePair> results = new ArrayList<BasicNameValuePair>();
+		results.add(new BasicNameValuePair("key",TrelloServerREST.devKey));
+		results.add(new BasicNameValuePair("token",this.token));
+		
+		HttpPut put;
+		if(member.getEmail() != null){
+			put = new HttpPut("https://api.trello.com/1/boards/" + theBoard.getId() + "/members");
+			results.add(new BasicNameValuePair("idMember", member.getId()));
+			results.add(new BasicNameValuePair("fullName", member.getFullName()));
+		} else {
+			results.add(new BasicNameValuePair("idMember", member.getId()));
+			put = new HttpPut("https://api.trello.com/1/boards/" + theBoard.getId() + "/members/" + member.getId());
+		}
+		
+		Log.d("TrelloServerREST - addUserToBoard", "Email:" + member.getEmail());
+		Log.d("TrelloServerREST - addUserToBoard", "Id:" + member.getId());
+
+
+		results.add(new BasicNameValuePair("type", "normal"));
+
+		if(results.size() == 0) return true; //No updates to be made
+		
+	
+		
+		try {
+			String result = "";
+			try {
+				put.setEntity(new UrlEncodedFormEntity(results));
+				HttpResponse response = client.execute(put);
+				result = EntityUtils.toString(response.getEntity());
+			} catch (IllegalStateException e) {
+				e.printStackTrace();
+				return false;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return false;
+			}
+			Log.d("addUserToBoard", "Update Response:" + result);
+		} catch (Exception e) {
+			Log.e("addUserToBoard","client protocol exception", e);
+			return false;
+		}
+		return true;
+	}
+
 	
 	public boolean updateBoard(TrelloBoard theBoard){
 		Log.d("TrelloServerREST - updateBoard", "Called");

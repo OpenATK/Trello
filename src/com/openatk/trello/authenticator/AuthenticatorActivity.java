@@ -180,6 +180,14 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
         		Log.d("authtoken:", authtoken);
                 TrelloMember member = trelloServer.getTrelloAccountInfo(authtoken);
                 if(member != null){
+                	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+            		SharedPreferences.Editor editor = prefs.edit();
+            		if(member.getEmail() != null) editor.putString("accountEmail", member.getEmail());
+            		if(member.getFullName() != null) editor.putString("accountFullName", member.getFullName());
+            		if(member.getUsername() != null) editor.putString("accountUsername", member.getUsername());
+            		if(member.getId() != null) editor.putString("accountId", member.getId());
+            		editor.commit();
+
                 	String accountName = "";
                 	if(member.getEmail() != null){
                 		accountName = member.getEmail();

@@ -70,6 +70,7 @@ public class TrelloServer  {
     
     public TrelloMember getTrelloAccountInfo(String token){
     	String url = "https://api.trello.com/1/members/me?key=" + AccountGeneral.API_KEY + "&token=" + token + "&fields=fullName,username,email";
+
     	HttpResponse response = getData(url);
     	String json = entityToString(response.getEntity());
     	Log.d("getTrelloAccountInfo:", json);

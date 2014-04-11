@@ -39,6 +39,7 @@ import java.util.List;
 
 import com.google.gson.Gson;
 import com.openatk.trello.authenticator.AccountGeneral;
+import com.openatk.trello.authenticator.TrelloMember;
 import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.provider.SyncProvider;
@@ -67,6 +68,8 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     private TrelloServerREST trelloServer = null;
     private String activeOrgo = null;
     
+    private TrelloMember activeMember = null;
+    
     public TrelloSyncAdapter(Context context, boolean autoInitialize) {
         super(context, autoInitialize);
         mAccountManager = AccountManager.get(context);
@@ -76,14 +79,22 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     public void onPerformSync(Account account, Bundle extras, String authority,
         ContentProviderClient provider, SyncResult syncResult) {
 
-    	
     	//Check if no account provided
+    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this.getContext());
     	if(account ==  null){
-	    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this.getContext());
 			String accountName = prefs.getString("accountName", null);
 			account = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
     	}
     	
+    	activeMember = new TrelloMember();
+    	activeMember.setEmail(prefs.getString("accountEmail", null));
+    	activeMember.setFullName(prefs.getString("accountFullName", null));
+    	activeMember.setId(prefs.getString("accountId", null));
+    	activeMember.setUsername(prefs.getString("accountUsername", null));
+ 
+		Log.d("SyncApp - onPerformSync", "accountEmail" + activeMember.getEmail());
+		Log.d("SyncApp - onPerformSync", "accountId" + activeMember.getId());
+
         // Building a print of the extras we got
         StringBuilder sb = new StringBuilder();
         if (extras != null) {
@@ -172,7 +183,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 				BoardResponse remoteBoard = remoteBoards.get(i);
 				Boolean found = false;
 				for(int j=0; j<localBoardsWithIds.size(); j++){
-	    			TrelloBoard localBoard = localBoards.get(j);
+	    			TrelloBoard localBoard = localBoardsWithIds.get(j);
 					if(localBoard.getId().contentEquals(remoteBoard.id)){
 						found = true;
 						break;
@@ -194,9 +205,39 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     		}
 				
 			//Get local boards again
-	    	localBoards = getLocalBoards(app);
+    		List<TrelloBoard> newLocalBoards = getLocalBoards(app);
 	    	Log.d("SyncApp", "Got local boards AGAIN");
-
+	    	
+    		List<TrelloBoard> toAddUserTo = new ArrayList<TrelloBoard>();
+    		
+	    	Log.d("SyncApp", "Find if we need to add this account to any boards.");
+	    	//Find boards that were accepted by the app
+	    	for(int i=0; i<localBoards.size(); i++){
+	    		TrelloBoard oldBoard = localBoards.get(i);
+	    		for(int j=0; j<newLocalBoards.size(); j++){
+		    		TrelloBoard newBoard = newLocalBoards.get(j);
+		    		if(oldBoard.getLocalId().contentEquals(newBoard.getLocalId())){
+		    			//This is our board now see if the app accepted it
+		    			if(oldBoard.getId().contentEquals(newBoard.getId()) == false){
+		    				//App updated the trello id, so it accepted the inserted board
+		    				//Add user to the board on trello
+		    				toAddUserTo.add(newBoard);
+			    	    	Log.d("SyncApp", "AddUser this board needs account added.");
+			    			break;
+		    			}
+		    		}
+	    		}
+	    	}
+	    	
+	    	Log.d("SyncApp", "Adding account to " + Integer.toString(toAddUserTo.size()) + " boards.");
+	    	
+			//Add user to boards on trello
+	    	for(int i=0; i<toAddUserTo.size(); i++){
+        		trelloServer.addUserToBoard(toAddUserTo.get(i), activeMember);
+	    	}
+	    	
+	    	localBoards = newLocalBoards;
+	    	
 	    	//For all w/o trello id
 	    	List<TrelloBoard> localBoardsWithoutIds = new ArrayList<TrelloBoard>();
 	    	for(int i=0; i<localBoards.size(); i++){
@@ -621,6 +662,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 	    	while(iter.hasNext()) {
 	    		TrelloCard lCard = iter.next(); // must be called before you can call i.remove()
 	    		if(lCard.getListId().length() == 0){
+			    	Log.d("SyncApp", "Removing card without trello id.");
 	    			iter.remove();
 	    		}
 	    	}
@@ -631,6 +673,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 				if(lCard.getId().length() > 0){
 					//Has Trello Id
 			    	//Compare dates with matching trello card and update accordingly
+			    	Log.d("SyncApp", "Local card has Trello Id");
 					Integer where = this.findCardWithId(trelloCards, lCard.getId());
 					if(where == null){
 						//On just local

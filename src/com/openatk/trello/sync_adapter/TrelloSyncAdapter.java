@@ -15,6 +15,12 @@
  */
 package com.openatk.trello.sync_adapter;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+
 import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.accounts.AuthenticatorException;
@@ -31,25 +37,19 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
-
 import com.google.gson.Gson;
+import com.openatk.libtrello.TrelloBoard;
+import com.openatk.libtrello.TrelloCard;
+import com.openatk.libtrello.TrelloList;
 import com.openatk.trello.authenticator.AccountGeneral;
 import com.openatk.trello.authenticator.TrelloMember;
 import com.openatk.trello.database.AppsTable;
-import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.provider.SyncProvider;
 import com.openatk.trello.response.ActionCombiner;
 import com.openatk.trello.response.BoardResponse;
 import com.openatk.trello.response.CardResponse;
 import com.openatk.trello.response.ListResponse;
-import com.openatk.trello.shared.TrelloBoard;
-import com.openatk.trello.shared.TrelloCard;
-import com.openatk.trello.shared.TrelloList;
+
 
 /**
  * TvShowsSyncAdapter implementation for syncing sample TvShowsSyncAdapter contacts to the
@@ -181,6 +181,9 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 
     		for(int i=0; i<remoteBoards.size(); i++){
 				BoardResponse remoteBoard = remoteBoards.get(i);
+				//Set all these as open
+				remoteBoard.closed = false;
+				
 				Boolean found = false;
 				for(int j=0; j<localBoardsWithIds.size(); j++){
 	    			TrelloBoard localBoard = localBoardsWithIds.get(j);
@@ -256,11 +259,11 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     	    	Log.d("SyncApp", "Insert board on trello");
         		if(trelloId != null){
 	        		TrelloBoard updateBoard = new TrelloBoard();
-					updateBoard.setLocalId(toAdd.getLocalId());
+					updateBoard.setSource(toAdd);
 					updateBoard.setId(trelloId);
 					updateBoard.setOrganizationId(activeOrgo);
 	        		//Update local database
-        	    	Log.d("SyncApp", "New trello board id:" + trelloId);
+        	    	Log.d("SyncApp", "Sending new trello board to local db, trello id:" + trelloId);
 					this.updateLocalBoard(app, updateBoard);
 			    	Log.d("SyncApp", "Getting local boards again");
         		} else {
@@ -333,6 +336,13 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 					newList.setClosed(false);
 					newList.setName(list.name);
 					newList.setPos(Integer.parseInt(list.pos));
+					
+					//Set all change events to sometime because trello always has change date if it has data
+					newList.setBoardId_changed(new Date(0));
+					newList.setClosed_changed(new Date(0));
+					newList.setName_changed(new Date(0));
+					newList.setPos_changed(new Date(0));
+
 					trelloLists.add(newList);
 				}
 		    	Log.d("SyncApp", Integer.toString(trelloLists.size()) + " lists found on trello");
@@ -352,6 +362,14 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 					//TODO labels
 					//TODO due
 					//TODO attachments
+					
+					//Set all dates to sometime because trello always has change date if it has data
+					newCard.setListId_changed(new Date(0));
+					newCard.setClosed_changed(new Date(0));
+					newCard.setName_changed(new Date(0));
+					newCard.setDesc_changed(new Date(0));
+					newCard.setPos_changed(new Date(0));
+
 					trelloCards.add(newCard);
 				}
 				
@@ -394,7 +412,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 				TrelloBoard updateTrello = new TrelloBoard(null);
 				TrelloBoard updateLocal = new TrelloBoard(null);
 				updateTrello.setId(lboard.getId());
-				updateLocal.setId(lboard.getId());
+				updateLocal.setSource(lboard);
 				if(trelloBoard.getName() != null){
 					if(lboard.getName().contentEquals(trelloBoard.getName()) == false){
 						//Trello different than local, who is newer?
@@ -454,8 +472,10 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 			Boolean hadNewLists = false;
 			for(int j=0; j<trelloLists.size(); j++){
 				TrelloList tList = trelloLists.get(j);
+				Log.d("TrelloSyncAdpater - new trello list?", "tlist id:" + tList.getId());
 				Boolean found = false;
 				for(int k=0; k<localLists.size(); k++){
+					Log.d("TrelloSyncAdpater - new trello list?","local list id:" + localLists.get(k).getId());
 					if(tList.getId().contentEquals(localLists.get(k).getId())){
 						found = true;
 						break;
@@ -493,19 +513,19 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 						updateTrello.setId(lList.getId());
 						
 						//Update Trello if change is after or equal to last sync date
-						if(lList.getName_changed().compareTo(lastSyncDate) >= 0) {
+						if(lList.getName_changed() != null && lList.getName_changed().compareTo(lastSyncDate) >= 0) {
 					    	Log.d("SyncApp", "Updating trello name");
 							updateTrello.setName(lList.getName());
 						}
-						if(lList.getPos_changed().compareTo(lastSyncDate) >= 0) {
+						if(lList.getPos_changed() != null && lList.getPos_changed().compareTo(lastSyncDate) >= 0) {
 					    	Log.d("SyncApp", "Updating trello pos");
 							updateTrello.setPos(lList.getPos());
 						}
-						if(lList.getBoardId_changed().compareTo(lastSyncDate) >= 0) {
+						if(lList.getBoardId_changed() != null && lList.getBoardId_changed().compareTo(lastSyncDate) >= 0) {
 					    	Log.d("SyncApp", "Updating trello boardId");
 							updateTrello.setBoardId(lList.getBoardId());
 						}
-						if(lList.getBoardId_changed().compareTo(lastSyncDate) >= 0) {
+						if(lList.getBoardId_changed() != null && lList.getClosed_changed().compareTo(lastSyncDate) >= 0) {
 					    	Log.d("SyncApp", "Updating trello closed");
 							updateTrello.setClosed(lList.getClosed());
 						}
@@ -517,12 +537,14 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 						TrelloList updateTrello = new TrelloList(null);
 						TrelloList updateLocal = new TrelloList(null);
 						updateTrello.setId(lList.getId());
-						updateLocal.setId(lList.getId());
+						updateLocal.setSource(lList);
 						//Name
 				    	Log.d("SyncApp", "Local List name_changed:" + TrelloServerREST.dateToTrelloDate(lList.getName_changed()));
-						if(tList.getName() == null) {
+						if(lList.getName() == null && tList.getName() == null){
+							Log.d("SyncApp", "Neither have name");
+						} else if(tList.getName() == null) {
 							Log.d("SyncApp", "Only local name exists");
-							if(lList.getName_changed().compareTo(lastSyncDate) >= 0){
+							if(lList.getName_changed() != null && lList.getName_changed().compareTo(lastSyncDate) >= 0){
 						    	Log.d("SyncApp", "Updating trello name");
 								updateTrello.setName(lList.getName());
 							}
@@ -530,7 +552,8 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 							//Compare dates, values and update accordingly
 							if(lList.getName().contentEquals(tList.getName()) == false){
 						    	Log.d("SyncApp", "Trello List name_changed:" + TrelloServerREST.dateToTrelloDate(tList.getName_changed()));
-								if(lList.getName_changed().after(tList.getName_changed())) {
+								if(lList.getName_changed() == null) Log.w("SyncApp", "Local list getName_changed field is null.");
+								if(lList.getName_changed() != null && lList.getName_changed().after(tList.getName_changed())) {
 							    	Log.d("SyncApp", "Updating trello name");
 									updateTrello.setName(lList.getName());
 								} else {
@@ -543,14 +566,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 						}
 						//Pos
 				    	Log.d("SyncApp", "Local List pos_changed:" + TrelloServerREST.dateToTrelloDate(lList.getPos_changed()));
-						if(tList.getPos() == null) {
+				    	if(lList.getPos() == null && tList.getPos() == null){
+							Log.d("SyncApp", "Neither have pos");
+						} else if(tList.getPos() == null) {
 							Log.d("SyncApp", "Only local pos exists");
-							if(lList.getPos_changed().compareTo(lastSyncDate) >= 0) updateTrello.setPos(lList.getPos());
+							if(lList.getPos_changed() != null && lList.getPos_changed().compareTo(lastSyncDate) >= 0) updateTrello.setPos(lList.getPos());
 						} else {
 							//Compare dates and update accordingly
 							if(lList.getPos() != tList.getPos()){
 						    	Log.d("SyncApp", "Trello List pos_changed:" + TrelloServerREST.dateToTrelloDate(tList.getPos_changed()));
-								if(lList.getPos_changed().after(tList.getPos_changed())) {
+								if(lList.getPos_changed() == null) Log.w("SyncApp", "Local list getPos_changed field is null.");
+								if(lList.getPos_changed() != null && lList.getPos_changed().after(tList.getPos_changed())) {
 							    	Log.d("SyncApp", "Updating trello pos");
 									updateTrello.setPos(lList.getPos());
 								} else {
@@ -563,14 +589,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 						}
 						//BoardId
 				    	Log.d("SyncApp", "Local List boardId_changed:" + TrelloServerREST.dateToTrelloDate(lList.getBoardId_changed()));
-						if(tList.getBoardId() == null) {
+				    	if(lList.getBoardId() == null && tList.getBoardId() == null){
+							Log.d("SyncApp", "Neither have board id");
+						} else if(tList.getBoardId() == null) {
 							Log.d("SyncApp", "Only local boardId exists");
-							if(lList.getBoardId_changed().compareTo(lastSyncDate) >= 0) updateTrello.setBoardId(lList.getBoardId());
+							if(lList.getBoardId_changed() != null && lList.getBoardId_changed().compareTo(lastSyncDate) >= 0) updateTrello.setBoardId(lList.getBoardId());
 						} else {
 							//Compare dates and update accordingly
 							if(lList.getBoardId().contentEquals(tList.getBoardId()) == false){
 						    	Log.d("SyncApp", "Trello List boardId_changed:" + TrelloServerREST.dateToTrelloDate(tList.getBoardId_changed()));
-								if(lList.getBoardId_changed().after(tList.getBoardId_changed())) {
+								if(lList.getBoardId_changed() == null) Log.w("SyncApp", "Local list getBoardId_changed field is null.");
+								if(lList.getBoardId_changed() != null && lList.getBoardId_changed().after(tList.getBoardId_changed())) {
 							    	Log.d("SyncApp", "Updating trello boardId");
 									updateTrello.setBoardId(lList.getBoardId());
 								} else {
@@ -583,14 +612,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 						}
 						//Closed
 				    	Log.d("SyncApp", "Local List closed_changed:" + TrelloServerREST.dateToTrelloDate(lList.getClosed_changed()));
-						if(tList.getClosed() == null){
+				    	if(lList.getClosed() == null && tList.getClosed() == null){
+							Log.d("SyncApp", "Neither have closed");
+						} else if(tList.getClosed() == null){
 							Log.d("SyncApp", "Only local closed exists");
-							if(lList.getClosed_changed().compareTo(lastSyncDate) >= 0) updateTrello.setClosed(lList.getClosed());
+							if(lList.getClosed_changed() != null && lList.getClosed_changed().compareTo(lastSyncDate) >= 0) updateTrello.setClosed(lList.getClosed());
 						} else {
 							if(lList.getClosed() != tList.getClosed()){
 						    	Log.d("SyncApp", "Trello List closed_changed:" + TrelloServerREST.dateToTrelloDate(tList.getClosed_changed()));
 						    	//Compare dates and update accordingly
-								if(lList.getClosed_changed().after(tList.getClosed_changed())) {
+								if(lList.getClosed_changed() == null) Log.w("SyncApp", "Local list getClosed_changed field is null.");
+								if(lList.getClosed_changed() != null && lList.getClosed_changed().after(tList.getClosed_changed())) {
 							    	Log.d("SyncApp", "Updating remote closed");
 									updateTrello.setClosed(lList.getClosed());
 								} else {
@@ -615,7 +647,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 					String trelloId = trelloServer.putList(lList);
 	        		if(trelloId != null){
 		        		TrelloList updateList = new TrelloList(null);
-		        		updateList.setLocalId(lList.getLocalId());
+		        		updateList.setSource(lList);
 		        		updateList.setId(trelloId);
 		        		//Update local database
 						this.updateLocalList(app, updateList);
@@ -684,27 +716,27 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 						TrelloCard updateTrello = new TrelloCard(null);
 						updateTrello.setId(lCard.getId());
 						
-						if(lCard.getName_changed().compareTo(lastSyncDate) >= 0) {
+						if(lCard.getName_changed() != null && lCard.getName_changed().compareTo(lastSyncDate) >= 0) {
 							Log.d("SyncApp", "Updating Trello Card Name");
 							updateTrello.setName(lCard.getName());
 						}
-						if(lCard.getDesc_changed().compareTo(lastSyncDate) >= 0){
+						if(lCard.getDesc_changed() != null && lCard.getDesc_changed().compareTo(lastSyncDate) >= 0){
 							Log.d("SyncApp", "Updating Trello Card Desc");
 							updateTrello.setDesc(lCard.getDesc());
 						}
-						if(lCard.getPos_changed().compareTo(lastSyncDate) >= 0){
+						if(lCard.getPos_changed() != null && lCard.getPos_changed().compareTo(lastSyncDate) >= 0){
 							Log.d("SyncApp", "Updating Trello Card Pos");
 							updateTrello.setPos(lCard.getPos());
 						}
-						if(lCard.getListId_changed().compareTo(lastSyncDate) >= 0) {
+						if(lCard.getListId_changed() != null && lCard.getListId_changed().compareTo(lastSyncDate) >= 0) {
 							Log.d("SyncApp", "Updating Trello Card ListId");
 							updateTrello.setListId(lCard.getListId());
 						}
-						if(lCard.getBoardId_changed().compareTo(lastSyncDate) >= 0){
+						if(lCard.getBoardId_changed() != null && lCard.getBoardId_changed().compareTo(lastSyncDate) >= 0){
 							Log.d("SyncApp", "Updating Trello Card BoardId");
 							updateTrello.setBoardId(lCard.getBoardId());
 						}
-						if(lCard.getClosed_changed().compareTo(lastSyncDate) >= 0){
+						if(lCard.getClosed_changed() != null && lCard.getClosed_changed().compareTo(lastSyncDate) >= 0){
 							Log.d("SyncApp", "Updating Trello Card Closed");
 							updateTrello.setClosed(lCard.getClosed());
 						}
@@ -717,15 +749,19 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 						TrelloCard updateTrello = new TrelloCard(null);
 						TrelloCard updateLocal = new TrelloCard(null);
 						updateTrello.setId(lCard.getId());
-						updateLocal.setId(lCard.getId());
+						updateLocal.setSource(lCard);
 						//Name
-						if(tCard.getName() == null) {
-							if(lCard.getName_changed().compareTo(lastSyncDate) >= 0) updateTrello.setName(lCard.getName());
+						if(lCard.getName() == null && tCard.getName() == null){
+					    	Log.d("SyncApp", "Neither have name.");
+						} else if(tCard.getName() == null) {
+					    	Log.d("SyncApp", "Only local name exists.");
+							if(lCard.getName_changed() != null && lCard.getName_changed().compareTo(lastSyncDate) >= 0) updateTrello.setName(lCard.getName());
 						} else {
 							//Compare dates and update accordingly
 							if(lCard.getName().contentEquals(tCard.getName()) == false){
-								Log.d("SyncApp", "Names are different");
-								if(lCard.getName_changed().after(tCard.getName_changed())) {
+								Log.d("SyncApp", "Names are different ie. local:" + lCard.getName()+ " trello:" + tCard.getName());
+								if(lCard.getName_changed() == null) Log.w("SyncApp", "Local card's name_changed field is null.");
+								if(lCard.getName_changed() != null && lCard.getName_changed().after(tCard.getName_changed())) {
 									Log.d("SyncApp", "Trello needs updated");
 									updateTrello.setName(lCard.getName());
 								} else {
@@ -735,13 +771,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 							}
 						}
 						//Desc
-						if(tCard.getDesc() == null) {
-							if(lCard.getDesc_changed().compareTo(lastSyncDate) >= 0) updateTrello.setDesc(lCard.getDesc());
+						if(lCard.getDesc() == null && tCard.getDesc() == null){
+					    	Log.d("SyncApp", "Neither have desc.");
+						} else if(tCard.getDesc() == null) {
+					    	Log.d("SyncApp", "Only local desc exists.");
+							if(lCard.getDesc_changed() != null && lCard.getDesc_changed().compareTo(lastSyncDate) >= 0) updateTrello.setDesc(lCard.getDesc());
 						} else {
-							//Compare dates and update accordingly, if local is null we that app doesn't care about this field
+							//Compare dates and update accordingly, if local is null then that app doesn't care about this field
 							if(lCard.getDesc() != null && lCard.getDesc().contentEquals(tCard.getDesc()) == false){
 								Log.d("SyncApp", "Descs are different");
-								if(lCard.getDesc_changed().after(tCard.getDesc_changed())) {
+								if(lCard.getDesc_changed() == null) Log.w("SyncApp", "Local card's desc_changed field is null.");
+								if(lCard.getDesc_changed() != null && lCard.getDesc_changed().after(tCard.getDesc_changed())) {
 									Log.d("SyncApp", "Trello needs updated");
 									updateTrello.setDesc(lCard.getDesc());
 								} else {
@@ -751,13 +791,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 							}
 						}
 						//Pos
-						if(tCard.getPos() == null) {
-							if(lCard.getPos_changed().compareTo(lastSyncDate) >= 0) updateTrello.setPos(lCard.getPos());
+						if(lCard.getPos() == null && tCard.getPos() == null){
+					    	Log.d("SyncApp", "Neither have pos.");
+						} else if(tCard.getPos() == null) {
+							Log.d("SyncApp", "Only local pos exists.");
+							if(lCard.getPos_changed() != null && lCard.getPos_changed().compareTo(lastSyncDate) >= 0) updateTrello.setPos(lCard.getPos());
 						} else {
 							//Compare dates and update accordingly, if local is null we that app doesn't care about this field
 							if(lCard.getPos() != null && lCard.getPos() != tCard.getPos()){
 								Log.d("SyncApp", "Pos are different");
-								if(lCard.getPos_changed().after(tCard.getPos_changed())) {
+								if(lCard.getPos_changed() == null) Log.w("SyncApp", "Local card's pos_changed field is null.");
+								if(lCard.getPos_changed() != null && lCard.getPos_changed().after(tCard.getPos_changed())) {
 									Log.d("SyncApp", "Trello needs updated");
 									updateTrello.setPos(lCard.getPos());
 								} else {
@@ -767,13 +811,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 							}
 						}
 						//ListId
-						if(tCard.getListId() == null) {
-							if(lCard.getListId_changed().compareTo(lastSyncDate) >= 0) updateTrello.setListId(lCard.getListId());
+						if(lCard.getListId() == null && tCard.getListId() == null){
+					    	Log.d("SyncApp", "Neither have listid.");
+						} else if(tCard.getListId() == null) {
+							Log.d("SyncApp", "Only local listid exists.");
+							if(lCard.getListId_changed() != null && lCard.getListId_changed().compareTo(lastSyncDate) >= 0) updateTrello.setListId(lCard.getListId());
 						} else {
 							//Compare dates and update accordingly
 							if(lCard.getListId().contentEquals(tCard.getListId()) == false){
 								Log.d("SyncApp", "ListId's are different");
-								if(lCard.getListId_changed().after(tCard.getListId_changed())) {
+								if(lCard.getListId_changed() == null) Log.w("SyncApp", "Local card's listid_changed field is null.");
+								if(lCard.getListId_changed() != null && lCard.getListId_changed().after(tCard.getListId_changed())) {
 									Log.d("SyncApp", "Trello needs updated");
 									updateTrello.setListId(lCard.getListId());
 								} else {
@@ -783,13 +831,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 							}
 						}
 						//BoardId
-						if(tCard.getBoardId() == null) {
-							if(lCard.getBoardId_changed().compareTo(lastSyncDate) >= 0) updateTrello.setBoardId(lCard.getBoardId());
+						if(lCard.getBoardId() == null && tCard.getBoardId() == null){
+					    	Log.d("SyncApp", "Neither have boardid.");
+						} else if(tCard.getBoardId() == null) {
+							Log.d("SyncApp", "Only local boardid exists.");
+							if(lCard.getBoardId_changed() != null && lCard.getBoardId_changed().compareTo(lastSyncDate) >= 0) updateTrello.setBoardId(lCard.getBoardId());
 						} else {
 							//Compare dates and update accordingly
 							if(lCard.getBoardId().contentEquals(tCard.getBoardId()) == false){
 								Log.d("SyncApp", "BoardId's are different");
-								if(lCard.getBoardId_changed().after(tCard.getBoardId_changed())) {
+								if(lCard.getBoardId_changed() == null) Log.w("SyncApp", "Local card's boardid_changed field is null.");
+								if(lCard.getBoardId_changed() != null && lCard.getBoardId_changed().after(tCard.getBoardId_changed())) {
 									Log.d("SyncApp", "Trello needs updated");
 									updateTrello.setBoardId(lCard.getBoardId());
 								} else {
@@ -799,13 +851,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 							}
 						}
 						//Closed
-						if(tCard.getClosed() == null) {
-							if(lCard.getClosed_changed().compareTo(lastSyncDate) >= 0) updateTrello.setClosed(lCard.getClosed());
+						if(lCard.getClosed() == null && tCard.getClosed() == null){
+					    	Log.d("SyncApp", "Neither have closed.");
+						} else if(tCard.getClosed() == null) {
+							Log.d("SyncApp", "Only local closed exists.");
+							if(lCard.getClosed_changed() != null && lCard.getClosed_changed().compareTo(lastSyncDate) >= 0) updateTrello.setClosed(lCard.getClosed());
 						} else {
 							//Compare dates and update accordingly
 							if(lCard.getClosed() != tCard.getClosed()){
 								Log.d("SyncApp", "Closeds are different");
-								if(lCard.getClosed_changed().after(tCard.getClosed_changed())) {
+								if(lCard.getClosed_changed() == null) Log.w("SyncApp", "Local card's closed_changed field is null.");
+								if(lCard.getClosed_changed() != null && lCard.getClosed_changed().after(tCard.getClosed_changed())) {
 									Log.d("SyncApp", "Trello needs updated");
 									updateTrello.setClosed(lCard.getClosed());
 								} else {
@@ -824,7 +880,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 					String trelloId = trelloServer.putCard(lCard);
 	        		if(trelloId != null){
 		        		TrelloCard updateCard = new TrelloCard(null);
-		        		updateCard.setLocalId(lCard.getLocalId());
+		        		updateCard.setSource(lCard);
 		        		updateCard.setId(trelloId);
 		        		//Update local database
 						this.updateLocalCard(app, updateCard);
@@ -841,7 +897,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 	    	//Update lastTrelloActionDate on local for this board
 			//Update lastSyncDate on local for this board
 	    	TrelloBoard updateBoard = new TrelloBoard();
-	    	updateBoard.setId(lboard.getId());
+	    	updateBoard.setSource(lboard);
 	    	updateBoard.setLastTrelloActionDate(TrelloServerREST.dateToTrelloDate(newLastActionDate));
 	    	updateBoard.setLastSyncDate(TrelloServerREST.dateToTrelloDate(newLastSyncDate));
 			this.updateLocalBoard(app, updateBoard);
@@ -924,6 +980,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     }
     
     private void updateLocalBoard(String app, TrelloBoard board){
+    	//TODO only do if not all null?
     	ContentValues values = new ContentValues();
 		Gson gson = new Gson();
 		String json = gson.toJson(board);
@@ -933,15 +990,21 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     }
     
     private void updateLocalList(String app, TrelloList list){
+    	//TODO only do if not all null? Why are the date of changes not null? Somehow created for update when shouldn't be there
 		ContentValues values = new ContentValues();
 		Gson gson = new Gson();
 		String json = gson.toJson(list);
+		if(json == null){
+			Log.d("updateLocalList", "json list is null");
+		}
+		Log.d("updateLocalList", "json list:" + json);
     	values.put("json", json);
 		Uri uri = Uri.parse("content://" + app + ".trello.provider/list");
     	this.getContext().getContentResolver().update(uri, values, null, null);  
     }
     
     private void updateLocalCard(String app, TrelloCard card){
+    	//TODO only do if not all null?
 		ContentValues values = new ContentValues();
 		Gson gson = new Gson();
 		String json = gson.toJson(card);

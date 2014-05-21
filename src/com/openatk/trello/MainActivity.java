@@ -20,6 +20,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -30,6 +31,7 @@ public class MainActivity extends Activity implements OnClickListener {
 	private Button test = null;
 	private AccountManager mAccountManager;
 	private Account mConnectedAccount;
+	WebView webView = null;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {

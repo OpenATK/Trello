@@ -2,14 +2,13 @@ package com.openatk.trello.response;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 
 import android.util.Log;
 
-import com.openatk.trello.shared.TrelloBoard;
-import com.openatk.trello.shared.TrelloCard;
-import com.openatk.trello.shared.TrelloList;
+import com.openatk.libtrello.TrelloBoard;
+import com.openatk.libtrello.TrelloCard;
+import com.openatk.libtrello.TrelloList;
 import com.openatk.trello.sync_adapter.TrelloServerREST;
 
 public class ActionCombiner {

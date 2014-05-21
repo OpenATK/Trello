@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.TimeZone;
 
 import org.apache.http.HttpResponse;
@@ -26,17 +25,16 @@ import org.apache.http.util.EntityUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.google.gson.Gson;
+import com.openatk.libtrello.TrelloBoard;
+import com.openatk.libtrello.TrelloCard;
+import com.openatk.libtrello.TrelloList;
 import com.openatk.trello.authenticator.TrelloMember;
-import com.openatk.trello.response.ActionResponse;
+import com.openatk.trello.internet.CommonLibrary;
 import com.openatk.trello.response.BoardResponse;
 import com.openatk.trello.response.OrganizationResponse;
-import com.openatk.trello.shared.TrelloBoard;
-import com.openatk.trello.shared.TrelloCard;
-import com.openatk.trello.shared.TrelloList;
 
 public class TrelloServerREST {
 	private static String devKey = "b1ae1192adda1b5b61563d30d7ab403b";
@@ -310,30 +308,54 @@ public class TrelloServerREST {
 		Log.d("TrelloServerREST - addUserToBoard", "Called");
 		HttpClient client = new DefaultHttpClient();
 		
+				
 		List<BasicNameValuePair> results = new ArrayList<BasicNameValuePair>();
-		results.add(new BasicNameValuePair("key",TrelloServerREST.devKey));
+		results.add(new BasicNameValuePair("key", TrelloServerREST.devKey));
 		results.add(new BasicNameValuePair("token",this.token));
+
+		//Add to board
+		HttpPut put = new HttpPut("https://api.trello.com/1/boards/"+ theBoard.getId() +"/members/" + member.getId());
 		
-		HttpPut put;
-		if(member.getEmail() != null){
-			put = new HttpPut("https://api.trello.com/1/boards/" + theBoard.getId() + "/members");
-			results.add(new BasicNameValuePair("idMember", member.getId()));
-			results.add(new BasicNameValuePair("fullName", member.getFullName()));
-		} else {
-			results.add(new BasicNameValuePair("idMember", member.getId()));
-			put = new HttpPut("https://api.trello.com/1/boards/" + theBoard.getId() + "/members/" + member.getId());
+		Log.d("TrelloServerREST - addUserToBoard ", "request: https://api.trello.com/1/boards/"+ theBoard.getId() +"/members/" + member.getId());
+		Log.d("TrelloServerREST - addUserToBoard", "token" + TrelloServerREST.devKey);
+		Log.d("TrelloServerREST - addUserToBoard", "key" + this.token);
+		
+		//results.add(new BasicNameValuePair("email","cyrusbow@gmail.com"));
+		results.add(new BasicNameValuePair("idMember",member.getId()));
+		Log.d("TrelloServerREST - addUserToBoard", "idMember" + member.getId());
+		Log.d("TrelloServerREST - addUserToBoard", "key" + this.token);
+		results.add(new BasicNameValuePair("type","normal"));
+		try {
+			String result = "";
+			try {
+				put.setEntity(new UrlEncodedFormEntity(results));
+				HttpResponse response = client.execute(put);
+				// Error here if no Internet TODO
+				InputStream is = response.getEntity().getContent(); 
+				result = CommonLibrary.convertStreamToString(is);
+			} catch (IllegalStateException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			Log.d("TrelloServerREST - addUserToBoard", "Add Response:" + result);
+		} catch (Exception e) {
+			// Auto-generated catch block
+			Log.e("TrelloServerREST - addUserToBoard","client protocol exception", e);
 		}
+		
+		
 		
 		Log.d("TrelloServerREST - addUserToBoard", "Email:" + member.getEmail());
 		Log.d("TrelloServerREST - addUserToBoard", "Id:" + member.getId());
 
 
-		results.add(new BasicNameValuePair("type", "normal"));
 
-		if(results.size() == 0) return true; //No updates to be made
-		
-	
-		
+		if(results.size() == 0){
+			Log.d("TrelloServerREST - addUserToBoard", "No updates to be made");
+			return true; //No updates to be made
+		}
+				
 		try {
 			String result = "";
 			try {
@@ -367,7 +389,10 @@ public class TrelloServerREST {
 		if(theBoard.getOrganizationId() != null) results.add(new BasicNameValuePair("idOrganization", theBoard.getOrganizationId()));
 		if(theBoard.getClosed() != null) results.add(new BasicNameValuePair("closed", Boolean.toString(theBoard.getClosed())));
 		
-		if(results.size() == 0) return true; //No updates to be made
+		if(results.size() == 0){
+			Log.d("TrelloServerREST - updateBoard", "No updates to be made");
+			return true; //No updates to be made
+		}
 		
 		results.add(new BasicNameValuePair("key",TrelloServerREST.devKey));
 		results.add(new BasicNameValuePair("token",this.token));
@@ -404,7 +429,10 @@ public class TrelloServerREST {
 		if(theList.getPos() != null) results.add(new BasicNameValuePair("pos", Integer.toString(theList.getPos())));
 		if(theList.getClosed() != null) results.add(new BasicNameValuePair("closed", Boolean.toString(theList.getClosed())));
 		
-		if(results.size() == 0) return true; //No updates to be made
+		if(results.size() == 0){
+			Log.d("TrelloServerREST - updateList", "No updates to be made");
+			return true; //No updates to be made
+		}
 		
 		results.add(new BasicNameValuePair("key",TrelloServerREST.devKey));
 		results.add(new BasicNameValuePair("token",this.token));
@@ -444,7 +472,10 @@ public class TrelloServerREST {
 		if(theCard.getClosed() != null) results.add(new BasicNameValuePair("closed", Boolean.toString(theCard.getClosed())));
 		//TODO labels, due, attachments
 		
-		if(results.size() == 0) return true; //No updates to be made
+		if(results.size() == 0){
+			Log.d("TrelloServerREST - updateCard", "No updates to be made");
+			return true; //No updates to be made
+		}
 
 		results.add(new BasicNameValuePair("key",TrelloServerREST.devKey));
 		results.add(new BasicNameValuePair("token",this.token));

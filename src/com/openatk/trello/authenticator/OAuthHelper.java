@@ -1,7 +1,6 @@
 package com.openatk.trello.authenticator;
 
 import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -27,7 +26,7 @@ public class OAuthHelper {
 			throws UnsupportedEncodingException {
 	    mConsumer = new CommonsHttpOAuthConsumer(consumerKey, consumerSecret);
 	    mProvider = new CommonsHttpOAuthProvider("https://trello.com/1/OAuthGetRequestToken",
-	    "https://trello.com/1/OAuthGetAccessToken", "https://trello.com/1/OAuthAuthorizeToken?name=OpenATK+Trello&expiration=never&scope=read,write");
+	    "https://trello.com/1/OAuthGetAccessToken", "https://trello.com/1/OAuthAuthorizeToken?name=OpenATK+Trello&expiration=never&scope=read,write,account");
 	    mProvider.setOAuth10a(true);
 	    mCallbackUrl = (callbackUrl == null ? OAuth.OUT_OF_BAND : callbackUrl);
 	    this.context = context;

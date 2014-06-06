@@ -1,10 +1,19 @@
 package com.openatk.trello;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
+import com.google.gson.Gson;
+import com.openatk.libtrello.TrelloContentProvider;
+import com.openatk.libtrello.TrelloList;
+import com.openatk.libtrello.TrelloSyncInfo;
 import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.internet.App;
@@ -13,11 +22,13 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.SyncInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
@@ -38,14 +49,22 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 	private ListView appsListView = null;
 	private TextView appsOrganizationName = null;
 	private List<App> appsList = null;
+	AppsArrayAdapter appsListAdapter = null;
 	
 	private boolean loading = false;
+	private static SimpleDateFormat dateFormaterLocal = new SimpleDateFormat("LLL d, yyyy h:mm a", Locale.US);
+	private static SimpleDateFormat dateFormaterUTC = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.apps_list);
 		
+		dateFormaterLocal.setTimeZone(TimeZone.getDefault());
+		dateFormaterUTC.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+
 		this.setTitle(getString(R.string.AppsListTitle));
 		appsListView = (ListView) findViewById(R.id.apps_list_view);
 		appsOrganizationName = (TextView) findViewById(R.id.apps_farm);
@@ -54,9 +73,9 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 		appsList = new ArrayList<App>();
 		
 		getAppList();
-		
-		AppsArrayAdapter adapter = new AppsArrayAdapter(this, R.layout.app, appsList);
-		appsListView.setAdapter(adapter);
+
+		appsListAdapter = new AppsArrayAdapter(this, R.layout.app, appsList);
+		appsListView.setAdapter(appsListAdapter);
 		appsListView.setOnItemClickListener(this);
 	}
 	
@@ -65,6 +84,31 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 		getAppList();
 		((BaseAdapter) appsListView.getAdapter()).notifyDataSetChanged();
 		super.onResume();
+	}
+	
+	public static String dateToStringLocal(Date date) {
+		if(date == null){
+			return null;
+		}
+		return AppsList.dateFormaterLocal.format(date);
+	}
+	public static Date stringToDateUTC(String date) {
+		if(date == null){
+			return null;
+		}
+		Date d;
+		try {
+			d = AppsList.dateFormaterUTC.parse(date);
+		} catch (ParseException e) {
+			d = new Date(0);
+		}
+		return d;
+	}
+	public static String dateToStringUTC(Date date) {
+		if(date == null){
+			return null;
+		}
+		return AppsList.dateFormaterUTC.format(date);
 	}
 
 	private void getAppList(){
@@ -78,33 +122,9 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 		List<ResolveInfo> services = packageManager.queryIntentActivities(sendIntent, 0);
 		Collections.sort(services, new ResolveInfo.DisplayNameComparator(packageManager));
 		
-		DatabaseHandler dbHandler = new DatabaseHandler(this);
-		SQLiteDatabase database = dbHandler.getWritableDatabase();
-		
-		SharedPreferences prefs = PreferenceManager
-				.getDefaultSharedPreferences(getApplicationContext());
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 		String orgoName = prefs.getString("organizationName", "Unknown");
 		appsOrganizationName.setText(orgoName);
-		
-		String[] columns = { AppsTable.COL_ID, AppsTable.COL_NAME, AppsTable.COL_PACKAGE_NAME, AppsTable.COL_ALLOW_SYNCING, AppsTable.COL_LAST_SYNC, AppsTable.COL_AUTO_SYNC, AppsTable.COL_BOARD_NAME };
-		
-	    List<App> appsInDb = new ArrayList<App>();
-	    
-		Cursor cursor = database.query(AppsTable.TABLE_NAME, columns, null, null,null, null, null);
-	    while (cursor.moveToNext()) {
-	    	Log.d("In Db", "it:" + cursor.getString(cursor.getColumnIndex(AppsTable.COL_NAME)));
-	    	Log.d("In Db", "it:" + cursor.getString(cursor.getColumnIndex(AppsTable.COL_PACKAGE_NAME)));
-	    	
-	    	Boolean isSynced = (cursor.getInt(cursor.getColumnIndex(AppsTable.COL_ALLOW_SYNCING)) == 1) ? true : false;
-	    	//Assume uninstalled
-	    	App newApp = new App(cursor.getLong(cursor.getColumnIndex(AppsTable.COL_ID)), isSynced, false, cursor.getString(cursor.getColumnIndex(AppsTable.COL_PACKAGE_NAME)), cursor.getString(cursor.getColumnIndex(AppsTable.COL_NAME)), null, null);
-	    	newApp.setLastSync(cursor.getString(cursor.getColumnIndex(AppsTable.COL_LAST_SYNC)));
-	    	newApp.setAutoSync(cursor.getInt(cursor.getColumnIndex(AppsTable.COL_AUTO_SYNC)));
-	    	newApp.setBoardName(cursor.getString(cursor.getColumnIndex(AppsTable.COL_BOARD_NAME)));
-	    	appsInDb.add(newApp);
-	    }
-	    cursor.close();
-	    dbHandler.close();
 		
 		if(services != null){
 			 final int count = services.size();
@@ -126,38 +146,70 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 	          	Log.d("AppList", "Package:" + packageName);
 	          	
 	          	Long theId = null;
-	          	Boolean isSynced = null;
+	          	Boolean isSynced = false;
 	          	Integer isAutoSynced = 0;
 	          	String lastSynced = null;
 	          	String boardName = null;
-	          	Iterator<App> iterator = appsInDb.iterator();
-	        	while (iterator.hasNext()) {
-	        		App compare = iterator.next();
-	        		String comparePackageName = compare.getPackageName();
-	        		if(comparePackageName != null && packageName.contentEquals(comparePackageName)){
-	        			theId = compare.getId();
-	        			isSynced = compare.getSyncApp();
-	        			isAutoSynced = compare.getAutoSync();
-	        			lastSynced = compare.getLastSync();
-	        			boardName = compare.getBoardName();
-	        			iterator.remove(); //Remove this found already
-	        		}
-	        	}
+	          	
 	          	App newApp = new App(theId, isSynced, true, packageName, name, desc, icon);
-		    	newApp.setAutoSync(isAutoSynced);
+	          	newApp.setAutoSync(isAutoSynced);
 		    	newApp.setInstalled(true);
 		    	newApp.setLastSync(lastSynced);
 		    	newApp.setBoardName(boardName);
+		    	
+	          	Uri uri = Uri.parse("content://" + newApp.getPackageName() + ".trello.provider/get_sync_info");
+		    	Cursor cursor2 = null;
+		    	boolean failed = false;
+		    	try {
+		    		cursor2 = this.getContentResolver().query(uri, null, null, null, null);
+		    	} catch(Exception e) {
+		    		failed = true;
+		    	}
+		    	if(failed == false){
+			    	Gson gson = new Gson();
+					TrelloSyncInfo syncInfo = null;
+			    	if(cursor2 != null){
+			    		while(cursor2.moveToNext()){
+			    			//Only 1 item for now
+			    			if(cursor2.getColumnCount() > 0 && cursor2.getColumnIndex("json") != -1){
+				    			String json = cursor2.getString(cursor2.getColumnIndex("json"));
+				    			try {
+				    				syncInfo = gson.fromJson(json, TrelloSyncInfo.class);
+				    			} catch (Exception e){
+				    				Log.d("Failed to convert json to info:", json);
+				    			}
+			    			}
+			    		}
+			    		cursor2.close();
+			    	}
+			    	if(syncInfo != null){
+					    Log.d("AppsList - onCreate",  "Has sync info");
+
+				    	if(syncInfo.getLastSync() == null){
+				    		newApp.setLastSync(null);
+				    	} else {
+				    		newApp.setLastSync(AppsList.dateToStringLocal(syncInfo.getLastSync()));
+				    	}
+				    	
+				    	if(syncInfo.getAutoSync() == null) syncInfo.setAutoSync(false);
+			    		newApp.setAutoSync(((syncInfo.getAutoSync() == true) ? 1 : 0));
+			    		
+			    		if(syncInfo.getSync() == null) syncInfo.setSync(false);
+			    		newApp.setSyncApp(syncInfo.getSync());
+			    		
+					    Log.d("AppsList - onCreate",  "Has sync info" + syncInfo.getSync());
+
+			    	}
+		    	} else {
+		    		//TODO add a "Incompatible Warning - Please Update"
+				    Log.d("AppsList - onCreate", newApp.getPackageName() + " Incompatible Warning - Please Update");
+		    		newApp.setSyncApp(false);
+		    		newApp.setAutoSync(0);
+		    		newApp.setLastSync(null);
+		    		newApp.setName(newApp.getName() + " - Incompatible version, please upgrade.");
+		    	}
 		    	newAppsList.add(newApp);
             }
-            //Add ones that arn't installed anymore (only one's left after removing)
-            Iterator<App> iterator = appsInDb.iterator();
-        	while (iterator.hasNext()) {
-        		App compare = iterator.next();
-        		compare.setSyncApp(false); //Can't sync anymore
-        		compare.setInstalled(false); //Can't sync anymore
-        		//newAppsList.add(compare);
-        	}
 		}
 		appsList.clear();
 		appsList.addAll(newAppsList);

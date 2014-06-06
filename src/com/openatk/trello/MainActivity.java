@@ -28,7 +28,6 @@ public class MainActivity extends Activity implements OnClickListener {
 
 	WebView browser = null;
 	private Button setupAccount = null;
-	private Button test = null;
 	private AccountManager mAccountManager;
 	private Account mConnectedAccount;
 	WebView webView = null;
@@ -43,9 +42,7 @@ public class MainActivity extends Activity implements OnClickListener {
         mAccountManager = AccountManager.get(this);
 		setupAccount = (Button) findViewById(R.id.setupAccount);
 		setupAccount.setOnClickListener(this);
-		
-		test = (Button) findViewById(R.id.test);
-		test.setOnClickListener(this);
+
 		
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 
@@ -68,14 +65,7 @@ public class MainActivity extends Activity implements OnClickListener {
 			go.putExtra("todo", "setup_account");
 			startActivity(go);*/
             getTokenForAccountCreateIfNeeded(AccountGeneral.ACCOUNT_TYPE, AccountGeneral.AUTHTOKEN_TYPE_FULL_ACCESS);
-		}
-		
-		if(v.getId() == R.id.test){
-			Bundle bundle = new Bundle();
-            bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true); // Performing a sync no matter if it's off
-            bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true); // Performing a sync no matter if it's off
-            ContentResolver.requestSync(mConnectedAccount, "com.openatk.trello.provider", bundle);
-		}
+		}		
 	}
 	
 	
@@ -97,7 +87,7 @@ public class MainActivity extends Activity implements OnClickListener {
         						editor.putString("accountName", accountName); //Temp
         						editor.commit();
                             }
-                            showMessage(((authToken != null) ? "SUCCESS!\ntoken: " + authToken : "FAIL"));
+                            //showMessage(((authToken != null) ? "SUCCESS!\ntoken: " + authToken : "FAIL"));
                             Log.d("udinic", "GetTokenForAccount Bundle is " + bnd);
                             //Done and worked... move on
                             //Go to organization list

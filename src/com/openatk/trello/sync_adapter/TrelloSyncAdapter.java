@@ -25,8 +25,11 @@ import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.accounts.AuthenticatorException;
 import android.accounts.OperationCanceledException;
+import android.app.ActivityManager;
+import android.app.ActivityManager.RunningAppProcessInfo;
 import android.content.AbstractThreadedSyncAdapter;
 import android.content.ContentProviderClient;
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -41,6 +44,8 @@ import com.google.gson.Gson;
 import com.openatk.libtrello.TrelloBoard;
 import com.openatk.libtrello.TrelloCard;
 import com.openatk.libtrello.TrelloList;
+import com.openatk.libtrello.TrelloSyncInfo;
+import com.openatk.trello.AppsList;
 import com.openatk.trello.authenticator.AccountGeneral;
 import com.openatk.trello.authenticator.TrelloMember;
 import com.openatk.trello.database.AppsTable;
@@ -78,7 +83,6 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     @Override
     public void onPerformSync(Account account, Bundle extras, String authority,
         ContentProviderClient provider, SyncResult syncResult) {
-
     	//Check if no account provided
     	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this.getContext());
     	if(account ==  null){
@@ -111,9 +115,77 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
         if(extras.containsKey("appId")){
         	appId = extras.getLong("appId");
         }
+        boolean isAutoSyncRequest = false;
+        if(extras.containsKey("isAutoSyncRequest")){
+        	isAutoSyncRequest = extras.getBoolean("isAutoSyncRequest", false);
+        }
 
         Log.d("udinic", TAG + "> onPerformSync for account[" + account.name + "]. Extras: "+sb.toString());
 
+    	//Check if autosync is on, if so then make sure the app is in foreground, otherwise turn off periodic interval
+        Uri uri = Uri.parse("content://" + appPackage + ".trello.provider/get_sync_info");
+    	Cursor cursor2 = null;
+    	boolean failed = false;
+    	try {
+    		cursor2 = this.getContext().getContentResolver().query(uri, null, null, null, null);
+    	} catch(Exception e) {
+    		failed = true;
+    	}
+    	
+		TrelloSyncInfo syncInfo = null;
+    	if(failed == false){
+	    	Gson gson = new Gson();
+	    	if(cursor2 != null){
+	    		while(cursor2.moveToNext()){
+	    			//Only 1 item for now
+	    			if(cursor2.getColumnCount() > 0 && cursor2.getColumnIndex("json") != -1){
+		    			String json = cursor2.getString(cursor2.getColumnIndex("json"));
+		    			try {
+		    				syncInfo = gson.fromJson(json, TrelloSyncInfo.class);
+		    			} catch (Exception e){
+		    				Log.d("Failed to convert json to info:", json);
+		    			}
+	    			}
+	    		}
+	    		cursor2.close();
+	    	}
+	    	
+	    	Bundle bundle = new Bundle();
+	        bundle.putString("appPackage", appPackage);
+	        bundle.putBoolean("isAutoSyncRequest", true);
+	        
+	        boolean turnOff = false;
+	    	if(syncInfo.getAutoSync() != null && syncInfo.getAutoSync() == false){
+	    		//Turn off periodic sync
+		        turnOff = true;
+	    	}
+	    	
+	    	//Check that app is in foreground if its an autosync request
+	    	if(isAutoSyncRequest == true && turnOff == false){
+	    		turnOff = true;
+				ActivityManager activityManager = (ActivityManager) this.getContext().getSystemService(Context.ACTIVITY_SERVICE);
+    	        List<RunningAppProcessInfo> procInfos = activityManager.getRunningAppProcesses();
+    	        for(int i = 0; i < procInfos.size(); i++) {
+    	            if(procInfos.get(i).processName.equals(appPackage) && procInfos.get(i).importance == RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+    	            	turnOff = false;
+    	            	break;
+    	            }
+    	        }
+	    	}
+	    	
+	    	if(turnOff == false){
+	    		Log.d("TrelloSyncAdapter", "add autosync");
+		        ContentResolver.addPeriodicSync(account, "com.openatk.trello.provider", bundle, 5*60*10000); //Every 5 minute
+	    	} else {
+	    		Log.d("TrelloSyncAdapter", "turn off autosync");
+		        ContentResolver.removePeriodicSync(account, "com.openatk.trello.provider", bundle);
+	    	}
+    	}
+        
+    	
+    	if(isAutoSyncRequest && syncInfo != null && syncInfo.getAutoSync() != null && syncInfo.getAutoSync() == false) return;
+    	if(syncInfo != null && syncInfo.getSync() != null && syncInfo.getSync() == false) return;
+    	
         try {
             // Get the auth token for the current account and
             // the userObjectId, needed for creating items on Parse.com account
@@ -901,6 +973,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 	    	updateBoard.setLastTrelloActionDate(TrelloServerREST.dateToTrelloDate(newLastActionDate));
 	    	updateBoard.setLastSyncDate(TrelloServerREST.dateToTrelloDate(newLastSyncDate));
 			this.updateLocalBoard(app, updateBoard);
+			this.updateLocalSyncDate(app, newLastSyncDate);
 		} //End local boards loop
 	}
     
@@ -986,6 +1059,17 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 		String json = gson.toJson(board);
     	values.put("json", json);
 		Uri uri = Uri.parse("content://" + app + ".trello.provider/board");
+    	this.getContext().getContentResolver().update(uri, values, null, null);  
+    }
+    
+    private void updateLocalSyncDate(String app, Date date){
+    	ContentValues values = new ContentValues();
+		Gson gson = new Gson();
+		TrelloSyncInfo newInfo = new TrelloSyncInfo();
+		newInfo.setLastSync(date);
+		String json = gson.toJson(newInfo);
+    	values.put("json", json);
+		Uri uri = Uri.parse("content://" + app + ".trello.provider/set_sync_info");
     	this.getContext().getContentResolver().update(uri, values, null, null);  
     }
     

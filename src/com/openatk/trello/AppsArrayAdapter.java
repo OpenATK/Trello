@@ -2,6 +2,8 @@ package com.openatk.trello;
 
 import java.util.List;
 
+import com.google.gson.Gson;
+import com.openatk.libtrello.TrelloSyncInfo;
 import com.openatk.trello.authenticator.AccountGeneral;
 import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
@@ -16,6 +18,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
@@ -72,7 +75,9 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 			Boolean auto = (apps.get(position).getAutoSync() == 1) ? true : false;
 			holder.autoSync.setChecked(auto);
 			holder.sync = (ImageButton)  row.findViewById(R.id.app_sync);
-			if(apps.get(position).getSyncApp()) holder.sync.setVisibility(View.VISIBLE);
+			
+			//TODO change to visible
+			if(apps.get(position).getSyncApp()) holder.sync.setVisibility(View.INVISIBLE);
 			
 			holder.txtViewTrello = (TextView)  row.findViewById(R.id.app_view_in_trello);
 			holder.txtAppLastSync = (TextView)  row.findViewById(R.id.app_last_sync);
@@ -185,12 +190,22 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 			final SyncHolder parentSyncHolder = (SyncHolder) buttonView.getTag();
 			final App parentApp = parentSyncHolder.app;
 			
-			if(isChecked){
+			if(isChecked && false){
+				//TODO
 				parentSyncHolder.syncButton.setVisibility(View.VISIBLE);
 			} else {
 				parentSyncHolder.syncButton.setVisibility(View.INVISIBLE);
 			}
 			
+			//Pass it to the app
+			ContentValues toPass = new ContentValues();
+			Gson gson = new Gson();
+			TrelloSyncInfo newInfo = new TrelloSyncInfo();
+			newInfo.setSync(isChecked);
+			String json = gson.toJson(newInfo);
+			toPass.put("json", json);
+			Uri uri = Uri.parse("content://" + parentApp.getPackageName() + ".trello.provider/set_sync_info");
+	    	getContext().getContentResolver().update(uri, toPass, null, null);  
 			
 			//Save this selection in database
 			database = dbHandler.getWritableDatabase();
@@ -245,6 +260,16 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 				boolean isChecked) {
 			final App parentApp = (App) buttonView.getTag();
 
+			//Pass it to the app
+			ContentValues toPass = new ContentValues();
+			Gson gson = new Gson();
+			TrelloSyncInfo newInfo = new TrelloSyncInfo();
+			newInfo.setAutoSync(isChecked);
+			String json = gson.toJson(newInfo);
+			toPass.put("json", json);
+			Uri uri = Uri.parse("content://" + parentApp.getPackageName() + ".trello.provider/set_sync_info");
+	    	getContext().getContentResolver().update(uri, toPass, null, null);  
+			
 			//Save this selection in database
 			database = dbHandler.getWritableDatabase();
 			
@@ -277,6 +302,23 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
  		    	database.insert(AppsTable.TABLE_NAME, null, newValues);
  		    	Log.d("AppsArrayAdapter - toggleAutoSyncListener", "Inserting" + parentApp.getPackageName());
 		    }
+		    
+		    if(newValue == 1){
+		    	Account account = null;
+		    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+		    	if(account ==  null){
+					String accountName = prefs.getString("accountName", null);
+					account = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
+		    	}
+		    } else {
+		    	Account account = null;
+		    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+		    	if(account ==  null){
+					String accountName = prefs.getString("accountName", null);
+					account = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
+		    	}
+		    }
+		    
 		    parentApp.setAutoSync(newValue);
 			cursor.close();
 			dbHandler.close();

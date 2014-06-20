@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">Trello</string>    
+    <string name="app_name">OATK Trello Sync</string>    
     <string name="login_change_account">Change Account</string>
     
 <!--     MainActivity -->  

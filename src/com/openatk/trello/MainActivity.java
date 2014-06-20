@@ -9,6 +9,7 @@ import android.accounts.AccountManagerFuture;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -64,13 +65,12 @@ public class MainActivity extends Activity implements OnClickListener {
 			/*Intent go = new Intent(this, Browser.class);
 			go.putExtra("todo", "setup_account");
 			startActivity(go);*/
-            getTokenForAccountCreateIfNeeded(AccountGeneral.ACCOUNT_TYPE, AccountGeneral.AUTHTOKEN_TYPE_FULL_ACCESS);
+            MainActivity.getTokenForAccountCreateIfNeeded(AccountGeneral.ACCOUNT_TYPE, AccountGeneral.AUTHTOKEN_TYPE_FULL_ACCESS, this);
 		}		
 	}
 	
-	
-	private void getTokenForAccountCreateIfNeeded(String accountType, String authTokenType) {
-        final AccountManagerFuture<Bundle> future = mAccountManager.getAuthTokenByFeatures(accountType, authTokenType, null, this, null, null,
+	public static void getTokenForAccountCreateIfNeeded(String accountType, String authTokenType, final Activity activity) {
+        final AccountManagerFuture<Bundle> future = AccountManager.get(activity).getAuthTokenByFeatures(accountType, authTokenType, null, activity, null, null,
                 new AccountManagerCallback<Bundle>() {
                     @Override
                     public void run(AccountManagerFuture<Bundle> future) {
@@ -80,10 +80,11 @@ public class MainActivity extends Activity implements OnClickListener {
                             String authToken = bnd.getString(AccountManager.KEY_AUTHTOKEN);
                             if (authToken != null) {
                                 String accountName = bnd.getString(AccountManager.KEY_ACCOUNT_NAME);
-                                mConnectedAccount = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
+                                //mConnectedAccount = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
                                 //Save the accountname to prefs
-                        		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+                        		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext());
         						SharedPreferences.Editor editor = prefs.edit();
+        						Log.d("MainActivity", "Account Name:" + accountName);
         						editor.putString("accountName", accountName); //Temp
         						editor.commit();
                             }
@@ -91,12 +92,11 @@ public class MainActivity extends Activity implements OnClickListener {
                             Log.d("udinic", "GetTokenForAccount Bundle is " + bnd);
                             //Done and worked... move on
                             //Go to organization list
-        					Intent go = new Intent(getApplicationContext(), OrganizationsList.class);
-        					startActivity(go);
+        					Intent go = new Intent(activity.getApplicationContext(), OrganizationsList.class);
+        					activity.startActivity(go);
                         } catch (Exception e) {
                         	Log.d("getTokenForAccountCreateIfNeeded", "error");
                             e.printStackTrace();
-                            showMessage(e.getMessage());
                         }
                     }
                 }
@@ -110,7 +110,8 @@ public class MainActivity extends Activity implements OnClickListener {
 		runOnUiThread(new Runnable() {
 		    @Override
 		    public void run() {
-		        Toast.makeText(getBaseContext(), msg, Toast.LENGTH_SHORT).show();
+		    	Log.d("MainActivity", "I am here");
+		        //Toast.makeText(getBaseContext(),"MainActivity" + msg, Toast.LENGTH_SHORT).show();
 		    }
 		});
 	}

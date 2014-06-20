@@ -16,12 +16,17 @@ import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.openatk.trello.authenticator.AccountGeneral;
 import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.database.LoginsTable;
 import com.openatk.trello.internet.CommonLibrary;
 import com.openatk.trello.internet.TrelloOrganization;
 
+import android.accounts.Account;
+import android.accounts.AccountManager;
+import android.accounts.AuthenticatorException;
+import android.accounts.OperationCanceledException;
 import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -49,6 +54,7 @@ public class AddOrganization extends Activity implements OnClickListener {
 	private EditText name = null;
 	private Boolean adding = false;
 	String todo = null;
+		
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -79,12 +85,8 @@ public class AddOrganization extends Activity implements OnClickListener {
 			if(strName == null || strName.length() == 0){
 				Toast.makeText(getApplicationContext(), "Please enter an organization name", Toast.LENGTH_LONG).show();
 			} else {
-				SharedPreferences prefs = PreferenceManager
-						.getDefaultSharedPreferences(getApplicationContext());
-				String apiKey = prefs.getString("apiKey", "null");
-				String token = prefs.getString("token", "null");
 				if(adding == false){
-					new AddOrganizationToTrello(this).execute(apiKey, token, strName);
+					new AddOrganizationToTrello(this).execute(strName);
 					adding = true;
 					setContentView(R.layout.loading);
 				}
@@ -112,20 +114,39 @@ public class AddOrganization extends Activity implements OnClickListener {
 		}
 		
 		protected TrelloOrganization doInBackground(String... query) {
+			
+			SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+			String accountName = prefs.getString("accountName", null);
+			Account theAccount = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
+	        AccountManager mAccountManager = AccountManager.get(this.parent.getApplicationContext());
+	        String authToken = "";
+			try {
+				authToken = mAccountManager.blockingGetAuthToken(theAccount, AccountGeneral.AUTHTOKEN_TYPE_FULL_ACCESS, true);
+			} catch (OperationCanceledException e) {
+				e.printStackTrace();
+			} catch (AuthenticatorException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
 			HttpClient client = new DefaultHttpClient();
 			HttpPost post = new HttpPost("https://api.trello.com/1/organizations");
 			List<BasicNameValuePair> results = new ArrayList<BasicNameValuePair>();
 			
-			results.add(new BasicNameValuePair("key",query[0]));
-			results.add(new BasicNameValuePair("token",query[1]));
+			Log.d("AddOrganizationToTrello", "Key:" + AccountGeneral.API_KEY);
+			Log.d("AddOrganizationToTrello", "token:" + authToken);
+
+			results.add(new BasicNameValuePair("key",AccountGeneral.API_KEY));
+			results.add(new BasicNameValuePair("token",authToken));
 			
 			TrelloOrganization newOrgo = null;
-			if(query[2] != null) results.add(new BasicNameValuePair("displayName", query[2]));
+			if(query[0] != null) results.add(new BasicNameValuePair("displayName", query[0]));
 			
 			try {
 				post.setEntity(new UrlEncodedFormEntity(results));
 			} catch (UnsupportedEncodingException e) {
-				Log.e("AddCardToTrello","An error has occurred", e);
+				Log.e("AddOrganizationToTrello","An error has occurred", e);
 			}
 			try {
 				HttpResponse response = client.execute(post);
@@ -145,7 +166,7 @@ public class AddOrganization extends Activity implements OnClickListener {
 					String newId = json.getString("id");
 					newOrgo = new TrelloOrganization();
 					newOrgo.setId(newId.trim());
-					newOrgo.setDisplayName(query[2]);
+					newOrgo.setDisplayName(query[0]);
 				} catch (JSONException e) {
 					e.printStackTrace();
 				}
@@ -179,6 +200,7 @@ public class AddOrganization extends Activity implements OnClickListener {
 				}
 				String where = LoginsTable.COL_ACTIVE + " = 1";
 				database.update(LoginsTable.TABLE_NAME, updateValues, where, null);
+				database.close();
 				dbHandler.close();
 
 				
@@ -191,10 +213,10 @@ public class AddOrganization extends Activity implements OnClickListener {
 				}
 				editor.putBoolean("FirstSetup", true);
 				editor.commit();
-				
 				//Notify all apps of change
 				if(oldOrgo != null && oldOrgo.contentEquals(newOrgo.getId()) == false){
 					String[] columns = { AppsTable.COL_PACKAGE_NAME, AppsTable.COL_ID };
+					database = dbHandler.getReadableDatabase();
 					Cursor cursor = database.query(AppsTable.TABLE_NAME, columns, null, null, null, null, null);
 				   	
 					ContentValues values = new ContentValues();
@@ -207,6 +229,7 @@ public class AddOrganization extends Activity implements OnClickListener {
 				    	getApplicationContext().getContentResolver().update(uri, values, null, null);  
 				    }
 					cursor.close();
+					database.close();
 					dbHandler.close();
 				}
 				

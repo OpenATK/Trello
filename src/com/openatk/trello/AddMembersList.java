@@ -121,9 +121,10 @@ public class AddMembersList extends Activity implements
 			if(item.getFullname().contentEquals(this.getString(R.string.add_member_list_new_person))){
 				//Create New Trello Account
 				Log.d("AddMembersList - onItemClick", "Create new Trello Account");
-				Intent go = new Intent(this, Browser.class);
+				/*Intent go = new Intent(this, Browser.class);
 				go.putExtra("todo", "add_account");
-				startActivity(go);
+				startActivity(go);*/
+				Log.w("AddMembersList", "Create new trello account");
 			}
 		} else {
 			if(item.getInOrgo() == false){

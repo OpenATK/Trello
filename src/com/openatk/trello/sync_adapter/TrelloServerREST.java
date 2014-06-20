@@ -266,8 +266,6 @@ public class TrelloServerREST {
 		results.add(new BasicNameValuePair("token",this.token));
 		results.add(new BasicNameValuePair("idList",card.getListId()));
 		results.add(new BasicNameValuePair("name",card.getName()));
-		if(card.getDesc() != null) results.add(new BasicNameValuePair("desc",card.getDesc()));
-		if(card.getPos() != null) results.add(new BasicNameValuePair("pos", Integer.toString(card.getPos())));
 		//TODO labels, due, attachments
 		
 		String newId = null;
@@ -301,6 +299,13 @@ public class TrelloServerREST {
 		} catch (IOException e) {
 			Log.e("putCard", "io exception", e);
 		}
+		
+		//Update card pos and desc
+		card.setId(newId);
+		if(card.getDesc() != null) results.add(new BasicNameValuePair("desc",card.getDesc()));
+		if(card.getPos() != null) results.add(new BasicNameValuePair("pos", Integer.toString(card.getPos())));
+		this.updateCard(card);
+		
 		return newId; //TODO handle failure
 	}
 	

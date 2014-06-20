@@ -70,9 +70,10 @@ public class LoginsList extends Activity implements OnClickListener, OnItemClick
 	    
 	    if(itemList.isEmpty()){
 	    	//Go to browser
-			Intent go = new Intent(this, Browser.class);
-			go.putExtra("Setup", true);
-			startActivity(go);
+			//Intent go = new Intent(this, Browser.class);
+			//go.putExtra("Setup", true);
+			//startActivity(go);
+			Log.w("LoginsList", "Login list empty, error");
 	    } else {
 	    	Login newLogin = new Login(null, "Add Account", null, null, null, null, null, null);
 	    	itemList.add(newLogin);
@@ -116,9 +117,10 @@ public class LoginsList extends Activity implements OnClickListener, OnItemClick
 		Login item = (Login) itemListAdapter.getItem(position);
 		if(item.getId() == null) {
 			//Go to browser
-			Intent go = new Intent(this, Browser.class);
+			/*Intent go = new Intent(this, Browser.class);
 			go.putExtra("todo", "change_account");
-			startActivity(go);
+			startActivity(go);*/
+			Log.w("LoginsList", "Login list change account");
 		} else {
 			SQLiteDatabase database = dbHandler.getWritableDatabase();
 			ContentValues updateValues2 = new ContentValues();

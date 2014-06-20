@@ -47,7 +47,7 @@ public class TrelloServer  {
     	String[] token = getVerifier(uri);
     	String[] accessToken = getVerifier(uri);
 		if (token != null) {
-			Log.d("Token not null", "Token not null");
+			Log.d("TrelloServer", "Token not null");
 				accessToken = authHelper.getAccessToken(token[1]);
 				Log.d("Token1:", accessToken[0]);
 				Log.d("Token2:", accessToken[1]);

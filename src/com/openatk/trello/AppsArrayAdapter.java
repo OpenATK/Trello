@@ -212,9 +212,7 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 			
 			String[] columns = { AppsTable.COL_ID, AppsTable.COL_PACKAGE_NAME, AppsTable.COL_ALLOW_SYNCING };
 			
-			Cursor cursor = database.query(AppsTable.TABLE_NAME,
-					columns, AppsTable.COL_PACKAGE_NAME + " = '" + parentApp.getPackageName() + "'", null,
-		        null, null, null);
+			Cursor cursor = database.query(AppsTable.TABLE_NAME, columns, AppsTable.COL_PACKAGE_NAME + " = '" + parentApp.getPackageName() + "'", null, null, null, null);
 			
 			
 	    	final Integer newValue = isChecked ? 1 : 0;
@@ -275,10 +273,7 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 			
 			String[] columns = { AppsTable.COL_ID, AppsTable.COL_PACKAGE_NAME, AppsTable.COL_AUTO_SYNC };
 			
-			Cursor cursor = database.query(AppsTable.TABLE_NAME,
-					columns, AppsTable.COL_PACKAGE_NAME + " = '" + parentApp.getPackageName() + "'", null,
-		        null, null, null);
-			
+			Cursor cursor = database.query(AppsTable.TABLE_NAME,columns, AppsTable.COL_PACKAGE_NAME + " = '" + parentApp.getPackageName() + "'", null, null, null, null);
 			
 	    	final Integer newValue = isChecked ? 1 : 0;
 	    	ContentValues values = new ContentValues();

@@ -765,7 +765,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 			Iterator<TrelloCard> iter = localCards.iterator();
 	    	while(iter.hasNext()) {
 	    		TrelloCard lCard = iter.next(); // must be called before you can call i.remove()
-	    		if(lCard.getListId().length() == 0){
+	    		if(lCard.getListId() == null || lCard.getListId().length() == 0){
 			    	Log.d("SyncApp", "Removing card without trello id.");
 	    			iter.remove();
 	    		}
@@ -1088,13 +1088,16 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     }
     
     private void updateLocalCard(String app, TrelloCard card){
-    	//TODO only do if not all null?
-		ContentValues values = new ContentValues();
-		Gson gson = new Gson();
-		String json = gson.toJson(card);
-    	values.put("json", json);
-		Uri uri = Uri.parse("content://" + app + ".trello.provider/card");
-    	this.getContext().getContentResolver().update(uri, values, null, null);        	
+    	if(card.getClosed() != null || card.getBoardId() != null || card.getDesc() != null || card.getLabels() != null || card.getListId() != null || card.getId() != null || card.getName() != null || card.getPos() != null){
+			ContentValues values = new ContentValues();
+			Gson gson = new Gson();
+			String json = gson.toJson(card);
+	    	values.put("json", json);
+			Uri uri = Uri.parse("content://" + app + ".trello.provider/card");
+	    	this.getContext().getContentResolver().update(uri, values, null, null);   
+    	} else {
+    		Log.d("updateLocalCard", "nothing changed, not updating.");
+    	}
     }
     
     private void insertLocalBoard(String app, TrelloBoard board){

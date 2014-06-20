@@ -39,7 +39,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
     private String mAuthTokenType;
     private TrelloServer trelloServer = null;
     private WebView browser;
-    
+    private boolean doneWithStep1 = false;
     
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -59,11 +59,11 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
         if (mAuthTokenType == null) mAuthTokenType = AccountGeneral.AUTHTOKEN_TYPE_FULL_ACCESS;
 
         browser = (WebView) findViewById(R.id.browser);
-		browser.getSettings().setJavaScriptEnabled(true);
+		//browser.getSettings().setJavaScriptEnabled(true);
 		
 		//Remove cookies to logout of trello and google
-		//android.webkit.CookieManager.getInstance().removeSessionCookie();
-		//android.webkit.CookieManager.getInstance().removeAllCookie();
+		android.webkit.CookieManager.getInstance().removeSessionCookie();
+		android.webkit.CookieManager.getInstance().removeAllCookie();
 		
 		browser.setWebViewClient(new WebViewClient() {	
 			@Override
@@ -71,7 +71,9 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
 				super.onPageStarted(view, url, favicon);
 				if(url.contains("openatk")){
 					browser.setVisibility(View.GONE);
-            		step2(url);
+					browser.destroy();
+            		if(doneWithStep1 == false) step2(url);
+            		doneWithStep1 = true;
 				}
 			}
 			public void onPageFinished(WebView view, String address){
@@ -122,13 +124,16 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
             @Override
             protected void onPostExecute(Intent intent) {
                 if (intent.hasExtra(KEY_ERROR_MESSAGE)) {
-                    Toast.makeText(getBaseContext(), intent.getStringExtra(KEY_ERROR_MESSAGE), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getApplicationContext(), intent.getStringExtra(KEY_ERROR_MESSAGE), Toast.LENGTH_SHORT).show();
+                	Log.d("AuthenticatorActivity", "step1 - error");
                 } else {
                 	Log.d("Returned no error", "starting browser if have uri");
                 	if(intent.hasExtra("URI")){
                 		browser.loadUrl(intent.getStringExtra("URI"));
                 		browser.setVisibility(View.VISIBLE);
+                    	Log.d("AuthenticatorActivity", "step1 - complete");
                 	}
+                	Log.d("AuthenticatorActivity", "step1 - error no uri");
                 }
             }
         }.execute();
@@ -159,9 +164,11 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
 	            @Override
 	            protected void onPostExecute(Intent intent) {
 	                if (intent.hasExtra(KEY_ERROR_MESSAGE)) {
-	                    Toast.makeText(getBaseContext(), intent.getStringExtra(KEY_ERROR_MESSAGE), Toast.LENGTH_SHORT).show();
+	                	Log.d("AuthenticatorActivity", "step2 - Error");
+	                    step4(intent);
 	                } else {
 	                	//We are done
+	                	Log.d("AuthenticatorActivity", "step2 - Complete");
 	                    step3(intent);
 	                }
 	            }
@@ -195,6 +202,10 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
                 		accountName = member.getUsername();
                 	}
                 	params[0].putExtra(AccountManager.KEY_ACCOUNT_NAME, accountName);
+                	Log.d("AuthenticatorActivity", "step3 - complete");
+                } else {
+                	Log.w("AuthenticatorActivity", "TrelloServer unable to get TrelloMemberData");
+                	Log.d("AuthenticatorActivity", "step3 - error");
                 }
                 return params[0];
             }
@@ -231,11 +242,14 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
 	        
 	        setAccountAuthenticatorResult(res.getExtras());
 	        setResult(RESULT_OK, res);
+        	Log.d("AuthenticatorActivity", "step4 - complete");
         } else {
         	Log.d("udinic", TAG + "> finishLogin > Failed");
-            Toast.makeText(getBaseContext(), "Failed to load account information. Please try again.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), "Failed to load account information. Please try again.", Toast.LENGTH_SHORT).show();
             setResult(RESULT_CANCELED, intent);
+        	Log.d("AuthenticatorActivity", "step4 - error");
         }
+    	Log.d("AuthenticatorActivity", "step4 - Complete");
         finish();
     }
 }

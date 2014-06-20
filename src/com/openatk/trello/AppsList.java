@@ -14,10 +14,15 @@ import com.google.gson.Gson;
 import com.openatk.libtrello.TrelloContentProvider;
 import com.openatk.libtrello.TrelloList;
 import com.openatk.libtrello.TrelloSyncInfo;
+import com.openatk.trello.authenticator.AccountGeneral;
 import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.internet.App;
 
+import android.accounts.Account;
+import android.accounts.AccountManager;
+import android.accounts.AccountManagerCallback;
+import android.accounts.AccountManagerFuture;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -91,7 +96,7 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 			return null;
 		}
 		return AppsList.dateFormaterLocal.format(date);
-	}
+	} 
 	public static Date stringToDateUTC(String date) {
 		if(date == null){
 			return null;
@@ -127,7 +132,7 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 		appsOrganizationName.setText(orgoName);
 		
 		if(services != null){
-			 final int count = services.size();
+			final int count = services.size();
 		    Log.d("AppsList - onCreate", "Here 2");
 
 			 Log.d("AppsList - onCreate", Integer.toString(count));
@@ -240,8 +245,9 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 			startActivity(go);
 		} else if(item.getItemId() == R.id.menu_apps_account){
 			// Show new app menu
-			Intent go = new Intent(this, LoginsList.class);
-			startActivity(go);
+			//Intent go = new Intent(this, LoginsList.class);
+			//startActivity(go);
+			removeAccountAndRemake();
 		} else if(item.getItemId() == R.id.menu_help){
 			AlertDialog.Builder alert = new AlertDialog.Builder(this);
 	        alert.setTitle("Help");
@@ -302,5 +308,55 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 	@Override
 	public void onItemClick(AdapterView<?> arg0, View view, int position, long id) {
 		Log.d("List item:", "test");
+	}
+	
+	private void removeAccountAndRemake(){
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+		SharedPreferences.Editor editor = prefs.edit();
+		editor.putBoolean("FirstSetup", false);
+		editor.commit();
+		
+		final Activity parent = this;
+		AccountManager mAccountManager = AccountManager.get(this);
+        mAccountManager.getAccountsByTypeAndFeatures(AccountGeneral.ACCOUNT_TYPE, null,
+                new AccountManagerCallback<Account[]>() {
+					@Override
+					public void run(AccountManagerFuture<Account[]> future) {
+						Account[] accounts = null;
+                        try {
+                        	accounts = future.getResult();
+                        	for(int i=0; i<accounts.length; i++){
+                        		Account acc = accounts[i];
+                        		Log.d("AppsList - getAccountList", "Account Name:" + acc.name);
+                        	}
+                        	if(accounts.length > 1) Log.w("AppsList getAccountList", "More than 1 account.");
+                        	if(accounts.length > 0) { 
+                        		removeAccount(accounts[0]);
+                        	} else {
+                        		Intent go = new Intent(parent, MainActivity.class);
+                    			parent.startActivity(go);
+                        	}
+                        } catch (Exception e) {
+                        	Log.d("getAccountList", "error");
+                            e.printStackTrace();
+                        }
+					}
+                }
+        , null);
+	}
+	
+	private void removeAccount(Account account){
+		final Activity parent = this;
+		AccountManager mAccountManager = AccountManager.get(this);
+		mAccountManager.removeAccount(account,
+                new AccountManagerCallback<Boolean>() {
+					@Override
+					public void run(AccountManagerFuture<Boolean> future) {
+						//Now we need to make a new account
+						Intent go = new Intent(parent, MainActivity.class);
+            			parent.startActivity(go);
+					}
+                }
+        , null);
 	}
 }

@@ -5,19 +5,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
-
-import com.google.gson.Gson;
-import com.openatk.libtrello.TrelloContentProvider;
-import com.openatk.libtrello.TrelloList;
-import com.openatk.libtrello.TrelloSyncInfo;
-import com.openatk.trello.authenticator.AccountGeneral;
-import com.openatk.trello.database.AppsTable;
-import com.openatk.trello.database.DatabaseHandler;
-import com.openatk.trello.internet.App;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -25,17 +15,16 @@ import android.accounts.AccountManagerCallback;
 import android.accounts.AccountManagerFuture;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.SyncInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
+import android.os.Handler;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -49,18 +38,23 @@ import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.google.gson.Gson;
+import com.openatk.libtrello.TrelloSyncInfo;
+import com.openatk.trello.authenticator.AccountGeneral;
+import com.openatk.trello.internet.App;
+
 public class AppsList extends Activity implements OnClickListener, OnItemClickListener {	
 	
 	private ListView appsListView = null;
 	private TextView appsOrganizationName = null;
-	private List<App> appsList = null;
+	private ArrayList<App> appsList = null;
 	AppsArrayAdapter appsListAdapter = null;
 	
 	private boolean loading = false;
 	private static SimpleDateFormat dateFormaterLocal = new SimpleDateFormat("LLL d, yyyy h:mm a", Locale.US);
 	private static SimpleDateFormat dateFormaterUTC = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+    private static final String AUTHORITY = "com.openatk.trello";
 
-	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -69,27 +63,67 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 		dateFormaterLocal.setTimeZone(TimeZone.getDefault());
 		dateFormaterUTC.setTimeZone(TimeZone.getTimeZone("UTC"));
 
-
 		this.setTitle(getString(R.string.AppsListTitle));
 		appsListView = (ListView) findViewById(R.id.apps_list_view);
 		appsOrganizationName = (TextView) findViewById(R.id.apps_farm);
 		
 		//Load organizations
-		appsList = new ArrayList<App>();
+		SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
+		String orgoName = prefs.getString("organizationName", "Unknown");
+		appsOrganizationName.setText(orgoName);
 		
-		getAppList();
-
+		appsList = getAppList(this);
 		appsListAdapter = new AppsArrayAdapter(this, R.layout.app, appsList);
+		
 		appsListView.setAdapter(appsListAdapter);
 		appsListView.setOnItemClickListener(this);
 	}
 	
 	@Override
 	protected void onResume() {
-		getAppList();
-		((BaseAdapter) appsListView.getAdapter()).notifyDataSetChanged();
+		//Load organizations
+		SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
+		String orgoName = prefs.getString("organizationName", "Unknown");
+		appsOrganizationName.setText(orgoName);
+		
+		List<App> newApps = getAppList(this);
+		
+		appsList.clear();
+		appsList.addAll(newApps);
+		
+		appsListAdapter.notifyDataSetChanged();
+		refreshAppList(10);
 		super.onResume();
 	}
+	
+	
+	
+	@Override
+	protected void onPause() {
+		if(delayRefreshAppList != null) handler.removeCallbacks(delayRefreshAppList);
+		delayRefreshAppList = null;
+		super.onPause();
+	}
+
+	Runnable delayRefreshAppList = null;
+	private Handler handler = new Handler();
+	private void refreshAppList(final int interval){
+		//Auto sync for presentations, allows intervals under 60 sec androids syncprovider minimum.
+		if(delayRefreshAppList != null) handler.removeCallbacks(delayRefreshAppList);
+		final Runnable r = new Runnable() {
+		    public void run() {
+		    	List<App> newApps = getAppList(getApplicationContext());
+				appsList.clear();
+				appsList.addAll(newApps);
+				appsListAdapter.notifyDataSetChanged();
+		    	
+		        if(delayRefreshAppList != null) handler.postDelayed(delayRefreshAppList, interval*1000);
+		    }
+		};
+		delayRefreshAppList = r;
+        handler.postDelayed(delayRefreshAppList, interval*1000);
+	}
+	
 	
 	public static String dateToStringLocal(Date date) {
 		if(date == null){
@@ -116,26 +150,23 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 		return AppsList.dateFormaterUTC.format(date);
 	}
 
-	private void getAppList(){
-		List<App> newAppsList = new ArrayList<App>();
+	public static ArrayList<App> getAppList(Context context){
+		ArrayList<App> newAppsList = new ArrayList<App>();
 		
 		//Find all supported apps
 		Intent sendIntent = new Intent();
 		sendIntent.setAction("com.openatk.trello");
 		
-		PackageManager packageManager = getPackageManager();
+		PackageManager packageManager = context.getPackageManager();
 		List<ResolveInfo> services = packageManager.queryIntentActivities(sendIntent, 0);
 		Collections.sort(services, new ResolveInfo.DisplayNameComparator(packageManager));
 		
-		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-		String orgoName = prefs.getString("organizationName", "Unknown");
-		appsOrganizationName.setText(orgoName);
-		
+	
 		if(services != null){
 			final int count = services.size();
 		    Log.d("AppsList - onCreate", "Here 2");
 
-			 Log.d("AppsList - onCreate", Integer.toString(count));
+			Log.d("AppsList - onCreate", Integer.toString(count));
 
             for (int i = 0; i < count; i++) {
 	          	ResolveInfo info = services.get(i);
@@ -150,15 +181,13 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 	          	Log.d("AppList", "Name:" + name);
 	          	Log.d("AppList", "Package:" + packageName);
 	          	
-	          	Long theId = null;
 	          	Boolean isSynced = false;
 	          	Integer isAutoSynced = 0;
 	          	String lastSynced = null;
 	          	String boardName = null;
 	          	
-	          	App newApp = new App(theId, isSynced, true, packageName, name, desc, icon);
+	          	App newApp = new App(isSynced, packageName, name, desc, icon);
 	          	newApp.setAutoSync(isAutoSynced);
-		    	newApp.setInstalled(true);
 		    	newApp.setLastSync(lastSynced);
 		    	newApp.setBoardName(boardName);
 		    	
@@ -166,7 +195,7 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 		    	Cursor cursor2 = null;
 		    	boolean failed = false;
 		    	try {
-		    		cursor2 = this.getContentResolver().query(uri, null, null, null, null);
+		    		cursor2 = context.getContentResolver().query(uri, null, null, null, null);
 		    	} catch(Exception e) {
 		    		failed = true;
 		    	}
@@ -203,7 +232,6 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 			    		newApp.setSyncApp(syncInfo.getSync());
 			    		
 					    Log.d("AppsList - onCreate",  "Has sync info" + syncInfo.getSync());
-
 			    	}
 		    	} else {
 		    		//TODO add a "Incompatible Warning - Please Update"
@@ -216,8 +244,7 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 		    	newAppsList.add(newApp);
             }
 		}
-		appsList.clear();
-		appsList.addAll(newAppsList);
+		return newAppsList;
 	}
 	
 	@Override
@@ -311,7 +338,7 @@ public class AppsList extends Activity implements OnClickListener, OnItemClickLi
 	}
 	
 	private void removeAccountAndRemake(){
-		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+		SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 		SharedPreferences.Editor editor = prefs.edit();
 		editor.putBoolean("FirstSetup", false);
 		editor.commit();

@@ -8,9 +8,7 @@ public class App {
 	private String desc = null;
 	private Drawable icon = null;
 	
-	private Long id = null;
 	private Boolean syncThisApp = false;
-	private Boolean installed = false;
 	
 	private Integer autoSync = null;
 	private String lastSync = null;
@@ -20,10 +18,8 @@ public class App {
 	
 	}
 	  	
-  	public App(Long Id, Boolean AppIsSynced, Boolean Installed, String PackageName, String Name, String Description, Drawable Icon) {
-		if(Id != null) setId(Id);
+  	public App(Boolean AppIsSynced, String PackageName, String Name, String Description, Drawable Icon) {
 		if(AppIsSynced != null) setSyncApp(AppIsSynced);
-		if(Installed != null) setInstalled(Installed);
   		if(PackageName != null) setPackage(PackageName);
 		if(Name != null) setName(Name);
 		if(Description != null) setDesc(Description);
@@ -61,15 +57,11 @@ public class App {
 		this.boardName = boardName;
 	}
 	
-	public void setId(Long newId){
-		id = newId;
-	}
+
 	public void setSyncApp(Boolean isAppSynced){
 		syncThisApp = isAppSynced;
 	}
-	public void setInstalled(Boolean isInstalled){
-		installed = isInstalled;
-	}
+
 	public void setPackage(String newPackage){
 		packageName = newPackage;
 	}
@@ -83,15 +75,8 @@ public class App {
 		icon = newIcon;
 	}
 	
-	
-	public Long getId(){
-		return id;
-	}
 	public Boolean getSyncApp(){
 		return syncThisApp;
-	}
-	public Boolean getInstalled(){
-		return installed;
 	}
 	public String getName(){
 		if(name != null) return name;

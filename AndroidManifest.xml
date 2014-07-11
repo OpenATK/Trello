@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.openatk.trello"
-    android:versionCode="4"
-    android:versionName="2.1" >
+    android:versionCode="5"
+    android:versionName="2.2" >
 
     <uses-sdk
         android:minSdkVersion="9"
@@ -30,7 +30,6 @@
     <!-- Sync Adapter -->
     <uses-permission android:name="android.permission.READ_SYNC_STATS" />
     <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
-    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
     <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
     
     <application
@@ -104,11 +103,6 @@
             </intent-filter>
         </activity>
         
-        <provider
-	      	android:name="com.openatk.trello.provider.SyncProvider"
-	      	android:authorities="com.openatk.trello.provider"
-	      	android:exported="true" />
-        
         
         <!-- Authenticator related activities and service needs to be declared here in order for the app to recognize them-->
         <activity android:name="com.openatk.trello.authenticator.AuthenticatorActivity" android:label="@string/label"/>
@@ -122,11 +116,15 @@
                        android:resource="@xml/authenticator" />
         </service>
 
+        <provider android:authorities="com.openatk.trello.provider"
+                  android:name="com.openatk.trello.sync_adapter.SyncProvider"
+                  android:exported="true"/>
+        
         <!-- Sync adapter related service -->
         <service
                 android:name="com.openatk.trello.sync_adapter.TrelloSyncService"
                 android:exported="true">
-            <intent-filter>
+            <intent-filter>com.openatk.trello.provider
                 <action android:name="android.content.SyncAdapter" />
             </intent-filter>
             <meta-data

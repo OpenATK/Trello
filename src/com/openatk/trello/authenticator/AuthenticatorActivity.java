@@ -59,7 +59,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity {
         if (mAuthTokenType == null) mAuthTokenType = AccountGeneral.AUTHTOKEN_TYPE_FULL_ACCESS;
 
         browser = (WebView) findViewById(R.id.browser);
-		//browser.getSettings().setJavaScriptEnabled(true);
+		browser.getSettings().setJavaScriptEnabled(true);
 		
 		//Remove cookies to logout of trello and google
 		android.webkit.CookieManager.getInstance().removeSessionCookie();

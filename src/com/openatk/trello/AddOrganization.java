@@ -17,9 +17,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.openatk.trello.authenticator.AccountGeneral;
-import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.database.LoginsTable;
+import com.openatk.trello.internet.App;
 import com.openatk.trello.internet.CommonLibrary;
 import com.openatk.trello.internet.TrelloOrganization;
 
@@ -29,6 +29,7 @@ import android.accounts.AuthenticatorException;
 import android.accounts.OperationCanceledException;
 import android.app.Activity;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -54,7 +55,8 @@ public class AddOrganization extends Activity implements OnClickListener {
 	private EditText name = null;
 	private Boolean adding = false;
 	String todo = null;
-		
+    private static final String AUTHORITY = "com.openatk.trello";
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -115,7 +117,7 @@ public class AddOrganization extends Activity implements OnClickListener {
 		
 		protected TrelloOrganization doInBackground(String... query) {
 			
-			SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+			SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 			String accountName = prefs.getString("accountName", null);
 			Account theAccount = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
 	        AccountManager mAccountManager = AccountManager.get(this.parent.getApplicationContext());
@@ -204,7 +206,7 @@ public class AddOrganization extends Activity implements OnClickListener {
 				dbHandler.close();
 
 				
-				SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+				SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 				String oldOrgo = prefs.getString("organizationId", null); //"52c5ca99511d04d44600214f"
 				SharedPreferences.Editor editor = prefs.edit();
 				editor.putString("organizationId", newOrgo.getId());
@@ -213,26 +215,20 @@ public class AddOrganization extends Activity implements OnClickListener {
 				}
 				editor.putBoolean("FirstSetup", true);
 				editor.commit();
+				
 				//Notify all apps of change
-				if(oldOrgo != null && oldOrgo.contentEquals(newOrgo.getId()) == false){
-					String[] columns = { AppsTable.COL_PACKAGE_NAME, AppsTable.COL_ID };
-					database = dbHandler.getReadableDatabase();
-					Cursor cursor = database.query(AppsTable.TABLE_NAME, columns, null, null, null, null, null);
-				   	
+				if(oldOrgo != null && oldOrgo.contentEquals(newOrgo.getId()) == false){				   	
 					ContentValues values = new ContentValues();
 			    	values.put("oldOrg", oldOrgo);
 			    	values.put("newOrg", newOrgo.getId());
-			    	
-				    while(cursor.moveToNext()){
-				    	String appPackage = cursor.getString(cursor.getColumnIndex(AppsTable.COL_PACKAGE_NAME));
-						Uri uri = Uri.parse("content://" + appPackage + ".trello.provider/board");
+
+			    	List<App> appsList = AppsList.getAppList(getApplicationContext());
+				    for(int i=0; i<appsList.size(); i++){
+				    	App app = appsList.get(i);			    	
+						Uri uri = Uri.parse("content://" + app.getPackageName() + ".trello.provider/organization");
 				    	getApplicationContext().getContentResolver().update(uri, values, null, null);  
 				    }
-					cursor.close();
-					database.close();
-					dbHandler.close();
 				}
-				
 				Intent go = new Intent(this.parent, MembersList.class);
 				this.parent.startActivity(go);
 			}

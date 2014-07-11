@@ -11,6 +11,7 @@ import com.openatk.trello.internet.TrelloMember;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -43,6 +44,7 @@ public class AddMembersList extends Activity implements
 	private boolean adding = false;
 	
 	DatabaseHandler dbHandler = null;
+    private static final String AUTHORITY = "com.openatk.trello";
 
 
 	@Override
@@ -53,7 +55,7 @@ public class AddMembersList extends Activity implements
 		membersListView = (ListView) findViewById(R.id.add_member_list_view);
 		searchBox = (EditText) findViewById(R.id.member_search);
 
-		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+		SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 		String orgoId = prefs.getString("organizationId", "null");
 		String accountName = prefs.getString("accountName", null);
 		
@@ -141,7 +143,7 @@ public class AddMembersList extends Activity implements
 				    	item.setInOrgo(true);
 				    	adding = true;
 				    	//Add to database
-				    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+						SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 						String orgoId = prefs.getString("organizationId", "null");
 				    	Log.d("AddMembersList - onItemClick", "Adding member, orgid:" + orgoId);
 						if(orgoId.contentEquals("null") == false){

@@ -6,12 +6,11 @@ import java.util.List;
 
 import com.google.gson.Gson;
 import com.openatk.trello.authenticator.AccountGeneral;
-import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.database.LoginsTable;
+import com.openatk.trello.internet.App;
 import com.openatk.trello.internet.OrganizationsHandler;
 import com.openatk.trello.internet.TrelloOrganization;
-import com.openatk.trello.provider.SyncProvider;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -19,6 +18,7 @@ import android.accounts.AuthenticatorException;
 import android.accounts.OperationCanceledException;
 import android.app.Activity;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -43,6 +43,7 @@ public class OrganizationsList extends Activity implements OnClickListener,
 	private DatabaseHandler dbHandler;
 
 	private ListView orgoList = null;
+    private static final String AUTHORITY = "com.openatk.trello";
 
 	private OrganizationsHandler organizationHandler = null;
 	private List<TrelloOrganization> organizationList = null;
@@ -62,7 +63,8 @@ public class OrganizationsList extends Activity implements OnClickListener,
 
 		orgoAdapter = new OrganizationArrayAdapter(this, R.layout.organization, organizationList);
 
-		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+		SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
+
 		String accountName = prefs.getString("accountName", null);
 		
        
@@ -121,8 +123,7 @@ public class OrganizationsList extends Activity implements OnClickListener,
 	@Override
 	public void onItemClick(AdapterView<?> arg0, View view, int position,
 			long id) {
-		TrelloOrganization item = (TrelloOrganization) orgoAdapter
-				.getItem(position);
+		TrelloOrganization item = (TrelloOrganization) orgoAdapter.getItem(position);
 
 		if(item.getId() == null){
 			//Add new organization
@@ -131,7 +132,7 @@ public class OrganizationsList extends Activity implements OnClickListener,
 		} else {
 			database = dbHandler.getWritableDatabase();
 			//Get old active orgo
-			SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+			SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 			String oldOrgo = prefs.getString("organizationId", null); //"52c5ca99511d04d44600214f"
 
 			//Set new active orgo
@@ -144,22 +145,18 @@ public class OrganizationsList extends Activity implements OnClickListener,
 			
 			//Notify all apps of change
 			if(oldOrgo != null && oldOrgo.contentEquals(newOrgo) == false){
-				String[] columns = { AppsTable.COL_PACKAGE_NAME, AppsTable.COL_ID };
-				Cursor cursor = database.query(AppsTable.TABLE_NAME, columns, null, null, null, null, null);
-				
 				ContentValues values = new ContentValues();
 		    	values.put("oldOrg", oldOrgo);
 		    	values.put("newOrg", newOrgo);
 		    	
-			    while(cursor.moveToNext()){
-			    	String appPackage = cursor.getString(cursor.getColumnIndex(AppsTable.COL_PACKAGE_NAME));
-					Uri uri = Uri.parse("content://" + appPackage + ".trello.provider/organization");
+				List<App> appsList = AppsList.getAppList(this);
+			    for(int i=0; i<appsList.size(); i++){
+			    	App app = appsList.get(i);			    	
+					Uri uri = Uri.parse("content://" + app.getPackageName() + ".trello.provider/organization");
 			    	this.getApplicationContext().getContentResolver().update(uri, values, null, null);  
 			    }
-				cursor.close();
-				dbHandler.close();
 			}
-			
+						
 			Intent go = new Intent(this, MembersList.class);
 			startActivity(go);
 		}		

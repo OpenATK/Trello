@@ -1,11 +1,12 @@
 package com.openatk.trello;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.google.gson.Gson;
+import com.openatk.libtrello.TrelloContentProvider;
 import com.openatk.libtrello.TrelloSyncInfo;
 import com.openatk.trello.authenticator.AccountGeneral;
-import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.internet.App;
 
@@ -39,13 +40,14 @@ import android.widget.ToggleButton;
 
 public class AppsArrayAdapter extends ArrayAdapter<App> {
 	private final Context context;
-	private List<App> apps = null;
+	private ArrayList<App> apps = null;
 	private int resId;
 	
 	private SQLiteDatabase database;
 	private DatabaseHandler dbHandler;
-	
-	public AppsArrayAdapter(Context context, int layoutResourceId, List<App> data) {
+    private static final String AUTHORITY = "com.openatk.trello";
+
+	public AppsArrayAdapter(Context context, int layoutResourceId, ArrayList<App> data) {
 		super(context, layoutResourceId, data);
 		this.resId = layoutResourceId;
 		this.context = context;
@@ -55,29 +57,19 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 
 	@Override
 	public View getView(int position, View convertView, ViewGroup parent) {
-		
 		View row = convertView;
 		AppHolder holder = null;
 		
-		
 		if(row == null){
-			LayoutInflater inflater = (LayoutInflater) context
-					.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+			LayoutInflater inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 			row = inflater.inflate(resId, parent, false);
-			
 
 			holder = new AppHolder();
 			holder.txtTitle = (TextView) row.findViewById(R.id.app_name);
 			holder.imgIcon = (ImageView) row.findViewById(R.id.app_icon);
 			holder.chkSyncing = (CheckBox) row.findViewById(R.id.app_checkbox);
-			holder.chkSyncing.setChecked(apps.get(position).getSyncApp());
 			holder.autoSync = (ToggleButton)  row.findViewById(R.id.app_auto_togglebutton);
-			Boolean auto = (apps.get(position).getAutoSync() == 1) ? true : false;
-			holder.autoSync.setChecked(auto);
 			holder.sync = (ImageButton)  row.findViewById(R.id.app_sync);
-			
-			//TODO change to visible
-			if(apps.get(position).getSyncApp()) holder.sync.setVisibility(View.INVISIBLE);
 			
 			holder.txtViewTrello = (TextView)  row.findViewById(R.id.app_view_in_trello);
 			holder.txtAppLastSync = (TextView)  row.findViewById(R.id.app_last_sync);
@@ -102,11 +94,6 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 	            }
 	        });
 			
-			
-			//TODO different color for uninstalled
-			if(apps.get(position).getInstalled() == false){
-				holder.chkSyncing.setEnabled(false);
-			}
 			
 			SyncHolder syncHolder = new SyncHolder();
 			syncHolder.app = apps.get(position);
@@ -137,13 +124,7 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 		
 		if(holder == null){
 			Log.d("AppsArrayAdapter", "holder null");
-		} else {
-			if(holder.txtTitle == null){
-				Log.d("AppsArrayAdapter", "txtTitle null");
-			} else {
-				holder.txtTitle.setText("test");
-			}
-		}
+		}	
 		
 		
 		
@@ -155,14 +136,23 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 			holder.txtAppLastSync.setText(apps.get(position).getLastSync());
 		}
 		
-				//ImageView imageView = (ImageView) rowView.findViewById(R.id.icon);
-		// Change the icon for Windows and iPhone
-//		String s = values[position];
-//		if (s.startsWith("iPhone")) {
-//			imageView.setImageResource(R.drawable.no);
-//		} else {
-//			imageView.setImageResource(R.drawable.ok);
-//		}
+		if(apps.get(position).getName().contains("Incompatible")){
+			holder.autoSync.setChecked(false);
+			holder.autoSync.setEnabled(false);
+			holder.sync.setVisibility(View.INVISIBLE);
+			holder.chkSyncing.setChecked(false);
+			holder.chkSyncing.setEnabled(false);
+		} else {
+			Boolean auto = (apps.get(position).getAutoSync() == 1) ? true : false;
+			holder.autoSync.setChecked(auto);
+			if(apps.get(position).getSyncApp()) holder.sync.setVisibility(View.VISIBLE);
+			holder.chkSyncing.setChecked(apps.get(position).getSyncApp());
+			holder.chkSyncing.setEnabled(true);
+			holder.autoSync.setEnabled(true);
+		}
+		
+		
+		
 		return row;
 	}
 	
@@ -185,13 +175,11 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 	
 	private OnCheckedChangeListener chkSyncingListener = new OnCheckedChangeListener(){
 		@Override
-		public void onCheckedChanged(CompoundButton buttonView,
-				boolean isChecked) {			
+		public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {			
 			final SyncHolder parentSyncHolder = (SyncHolder) buttonView.getTag();
 			final App parentApp = parentSyncHolder.app;
 			
-			if(isChecked && false){
-				//TODO
+			if(isChecked){
 				parentSyncHolder.syncButton.setVisibility(View.VISIBLE);
 			} else {
 				parentSyncHolder.syncButton.setVisibility(View.INVISIBLE);
@@ -207,39 +195,9 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 			Uri uri = Uri.parse("content://" + parentApp.getPackageName() + ".trello.provider/set_sync_info");
 	    	getContext().getContentResolver().update(uri, toPass, null, null);  
 			
-			//Save this selection in database
-			database = dbHandler.getWritableDatabase();
-			
-			String[] columns = { AppsTable.COL_ID, AppsTable.COL_PACKAGE_NAME, AppsTable.COL_ALLOW_SYNCING };
-			
-			Cursor cursor = database.query(AppsTable.TABLE_NAME, columns, AppsTable.COL_PACKAGE_NAME + " = '" + parentApp.getPackageName() + "'", null, null, null, null);
-			
-			
-	    	final Integer newValue = isChecked ? 1 : 0;
-	    	ContentValues values = new ContentValues();
-	    	values.put(AppsTable.COL_ALLOW_SYNCING, newValue);
-	    	
-			Long id = null;
-			Integer selected = null;
-		    if(cursor.moveToFirst()){
-		    	id = cursor.getLong(cursor.getColumnIndex(AppsTable.COL_ID));
-			    selected = cursor.getInt(cursor.getColumnIndex(AppsTable.COL_ALLOW_SYNCING));
-			    if((selected == 0 && isChecked == true) || (selected == 1 && isChecked == false)){
-			    	//update
-			    	database.update(AppsTable.TABLE_NAME, values,(AppsTable.COL_ID + "=" + id.toString()),null);
-			    }
-		    } else {
-            	ContentValues newValues = new ContentValues();
-            	newValues.put(AppsTable.COL_ALLOW_SYNCING, newValue);
-            	newValues.put(AppsTable.COL_NAME, parentApp.getName());
-            	newValues.put(AppsTable.COL_PACKAGE_NAME, parentApp.getPackageName());
- 		    	database.insert(AppsTable.TABLE_NAME, null, newValues);
- 		    	Log.d("AppsArrayAdapter - chkSyncingListener", "Inserting" + parentApp.getPackageName());
-		    }
+				
 		    parentApp.setSyncApp(isChecked);
 			Log.d("Selected", parentApp.getName());
-			cursor.close();
-			dbHandler.close();
 			
 			if(isChecked){
 				//Send intent to package to enable trello syncing
@@ -254,8 +212,7 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 	
 	private OnCheckedChangeListener toggleAutoSyncListener = new OnCheckedChangeListener(){
 		@Override
-		public void onCheckedChanged(CompoundButton buttonView,
-				boolean isChecked) {
+		public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
 			final App parentApp = (App) buttonView.getTag();
 
 			//Pass it to the app
@@ -268,55 +225,25 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 			Uri uri = Uri.parse("content://" + parentApp.getPackageName() + ".trello.provider/set_sync_info");
 	    	getContext().getContentResolver().update(uri, toPass, null, null);  
 			
-			//Save this selection in database
-			database = dbHandler.getWritableDatabase();
-			
-			String[] columns = { AppsTable.COL_ID, AppsTable.COL_PACKAGE_NAME, AppsTable.COL_AUTO_SYNC };
-			
-			Cursor cursor = database.query(AppsTable.TABLE_NAME,columns, AppsTable.COL_PACKAGE_NAME + " = '" + parentApp.getPackageName() + "'", null, null, null, null);
-			
-	    	final Integer newValue = isChecked ? 1 : 0;
-	    	ContentValues values = new ContentValues();
-	    	values.put(AppsTable.COL_AUTO_SYNC, newValue);
+	
+	    	Account account = null;
+			SharedPreferences prefs = getContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
+	    	if(account ==  null){
+				String accountName = prefs.getString("accountName", null);
+				account = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
+	    	}
 	    	
-			Long id = null;
-			Integer selected = null;
-		    if(cursor.moveToFirst()){
-		    	id = cursor.getLong(cursor.getColumnIndex(AppsTable.COL_ID));
-			    selected = cursor.getInt(cursor.getColumnIndex(AppsTable.COL_AUTO_SYNC));
-			    if((selected == 0 && isChecked == true) || (selected == 1 && isChecked == false)){
-			    	//update
-			    	Log.d("AppsArrayAdapter - onCheckChanged", "Updating autosync in db");
-			    	database.update(AppsTable.TABLE_NAME, values,(AppsTable.COL_ID + "=" + id.toString()),null);
-			    }
-		    } else {
-            	ContentValues newValues = new ContentValues();
-            	newValues.put(AppsTable.COL_AUTO_SYNC, newValue);
-            	newValues.put(AppsTable.COL_NAME, parentApp.getName());
-            	newValues.put(AppsTable.COL_PACKAGE_NAME, parentApp.getPackageName());
- 		    	database.insert(AppsTable.TABLE_NAME, null, newValues);
- 		    	Log.d("AppsArrayAdapter - toggleAutoSyncListener", "Inserting" + parentApp.getPackageName());
-		    }
-		    
-		    if(newValue == 1){
-		    	Account account = null;
-		    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-		    	if(account ==  null){
-					String accountName = prefs.getString("accountName", null);
-					account = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
-		    	}
-		    } else {
-		    	Account account = null;
-		    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-		    	if(account ==  null){
-					String accountName = prefs.getString("accountName", null);
-					account = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
-		    	}
-		    }
-		    
+	    	//Do sync to enable setting
+	    	if(isChecked){
+		    	Bundle bundle = new Bundle();
+		        bundle.putBoolean("isAutoSyncRequest", true);
+		        bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true); // Performing a sync no matter if it's off
+		        bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true); // Performing a sync no matter if it's off
+				TrelloContentProvider.Sync(parentApp.getPackageName(), bundle);	
+	    	}
+	    	
+	    	Integer newValue = isChecked ? 1 : 0;
 		    parentApp.setAutoSync(newValue);
-			cursor.close();
-			dbHandler.close();
 		}
 	};
 	
@@ -324,16 +251,8 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
 		@Override
 		public void onClick(View v) {
 			final App parentApp = (App) v.getTag();
-			//Send a sync intent to this app
-			PackageManager pm = context.getPackageManager();
-			/*Intent appStartIntent = pm.getLaunchIntentForPackage(parentApp.getPackageName());
-			appStartIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-			if(appStartIntent != null){
-				appStartIntent.putExtra("todo", "sync");
-			    context.startActivity(appStartIntent);
-			}*/
 			
-			SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+			SharedPreferences prefs = getContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 			String accountName = prefs.getString("accountName", null);
 			Account theAccount = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
 			
@@ -341,7 +260,6 @@ public class AppsArrayAdapter extends ArrayAdapter<App> {
             bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true); // Performing a sync no matter if it's off
             bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true); // Performing a sync no matter if it's off
             bundle.putString("appPackage", parentApp.getPackageName());
-            //bundle.putLong("appId", parentApp.getId());
             ContentResolver.requestSync(theAccount, "com.openatk.trello.provider", bundle);
 		}
 	};

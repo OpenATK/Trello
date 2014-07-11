@@ -9,7 +9,6 @@ import com.openatk.trello.database.OrganizationMembersTable;
 import com.openatk.trello.internet.MembersHandler;
 import com.openatk.trello.internet.TrelloMember;
 
-
 import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Context;
@@ -39,6 +38,7 @@ public class MembersArrayAdapter extends ArrayAdapter<TrelloMember> {
 	private Bitmap addIcon;
 	private MembersHandler handler;
 	DatabaseHandler dbHandler = null;
+    private static final String AUTHORITY = "com.openatk.trello";
 
 	
 	public MembersArrayAdapter(Context context, int layoutResourceId,
@@ -205,7 +205,7 @@ public class MembersArrayAdapter extends ArrayAdapter<TrelloMember> {
 				.setPositiveButton(R.string.member_list_remove_dialog_yes, new DialogInterface.OnClickListener() {
 				    public void onClick(DialogInterface dialog, int whichButton) {
 						holder.member.setInOrgo(false);
-						SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+						SharedPreferences prefs = context.getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 						String orgoId = prefs.getString("organizationId", "null");
 						if(orgoId.contentEquals("null") == false){
 							SQLiteDatabase database = dbHandler.getWritableDatabase();

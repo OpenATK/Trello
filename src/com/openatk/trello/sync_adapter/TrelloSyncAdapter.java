@@ -48,8 +48,6 @@ import com.openatk.libtrello.TrelloSyncInfo;
 import com.openatk.trello.AppsList;
 import com.openatk.trello.authenticator.AccountGeneral;
 import com.openatk.trello.authenticator.TrelloMember;
-import com.openatk.trello.database.AppsTable;
-import com.openatk.trello.provider.SyncProvider;
 import com.openatk.trello.response.ActionCombiner;
 import com.openatk.trello.response.BoardResponse;
 import com.openatk.trello.response.CardResponse;
@@ -66,7 +64,7 @@ import com.openatk.trello.response.ListResponse;
 public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 
     private static final String TAG = "TrelloSyncAdapter";
-
+    private static final String AUTHORITY = "com.openatk.trello";
     private final AccountManager mAccountManager;
 
     private String authToken = null;
@@ -84,7 +82,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     public void onPerformSync(Account account, Bundle extras, String authority,
         ContentProviderClient provider, SyncResult syncResult) {
     	//Check if no account provided
-    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this.getContext());
+		SharedPreferences prefs = this.getContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
     	if(account ==  null){
 			String accountName = prefs.getString("accountName", null);
 			account = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
@@ -155,11 +153,11 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 	        bundle.putBoolean("isAutoSyncRequest", true);
 	        
 	        boolean turnOff = false;
-	    	if(syncInfo.getAutoSync() != null && syncInfo.getAutoSync() == false){
+	    	if(syncInfo == null || syncInfo.getAutoSync() != null && syncInfo.getAutoSync() == false){
 	    		//Turn off periodic sync
 		        turnOff = true;
 	    	}
-	    	
+	    		    	
 	    	//Check that app is in foreground if its an autosync request
 	    	if(isAutoSyncRequest == true && turnOff == false){
 	    		turnOff = true;
@@ -167,6 +165,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     	        List<RunningAppProcessInfo> procInfos = activityManager.getRunningAppProcesses();
     	        for(int i = 0; i < procInfos.size(); i++) {
     	            if(procInfos.get(i).processName.equals(appPackage) && procInfos.get(i).importance == RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+        	        	Log.d("TrelloSyncAdapter", "App:" + appPackage + " info:" + procInfos.get(i).processName);
     	            	turnOff = false;
     	            	break;
     	            }
@@ -174,18 +173,22 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
 	    	}
 	    	
 	    	if(turnOff == false){
-	    		Log.d("TrelloSyncAdapter", "add autosync");
-		        ContentResolver.addPeriodicSync(account, "com.openatk.trello.provider", bundle, 5*60*10000); //Every 5 minute
+	    		Integer interval = 30;
+	    		if(syncInfo.getInterval() != null) interval = syncInfo.getInterval();
+	    		Log.d("TrelloSyncAdapter", "add autosync, interval:" + Integer.toString(interval));
+		        ContentResolver.addPeriodicSync(account, "com.openatk.trello.provider", bundle, interval);
 	    	} else {
 	    		Log.d("TrelloSyncAdapter", "turn off autosync");
 		        ContentResolver.removePeriodicSync(account, "com.openatk.trello.provider", bundle);
 	    	}
+	    	
+	    	//If autosync and not in foreground don't sync
+	    	if(isAutoSyncRequest && turnOff) return;
     	}
-        
     	
     	if(isAutoSyncRequest && syncInfo != null && syncInfo.getAutoSync() != null && syncInfo.getAutoSync() == false) return;
     	if(syncInfo != null && syncInfo.getSync() != null && syncInfo.getSync() == false) return;
-    	
+    	    	
         try {
             // Get the auth token for the current account and
             // the userObjectId, needed for creating items on Parse.com account
@@ -193,15 +196,9 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
             //String userObjectId = mAccountManager.getUserData(account,AccountGeneral.USERDATA_USER_OBJ_ID);
             trelloServer = new TrelloServerREST(authToken);
             
-             Cursor cursor = provider.query(SyncProvider.CONTENT_URI_ACTIVE_ORGANIZATION, null, null, null, null);
-             if (cursor != null) {
-            	 if(cursor.moveToFirst()){
-                	 activeOrgo = cursor.getString(0);
-                	 Log.d("Active Organization Id:",activeOrgo);
-            	 }
-                 cursor.close();
-             }
-             SyncApp(appPackage, provider);
+	    	activeOrgo = prefs.getString("organizationId", "");
+            Log.d("Active Organization Id:",activeOrgo);
+            SyncApp(appPackage, provider);
         } catch (OperationCanceledException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -219,17 +216,7 @@ public class TrelloSyncAdapter extends AbstractThreadedSyncAdapter {
     public void SyncApp(String app, ContentProviderClient provider) throws Exception{
 		//Sync a specific app
 		Date newLastSyncDate = new Date(); //TODO pull from internet
-		Uri appUri = Uri.parse(SyncProvider.CONTENT_URI.toString() + "/" + app);
-		Cursor cursor = provider.query(appUri, null, null, null, null);
 		
-        if (cursor != null) {
-        	 if(cursor.moveToFirst()){
-        		 String appName = cursor.getString(cursor.getColumnIndex(AppsTable.COL_NAME));
-        		 Log.d("Found App:", appName);
-        	 }
-             cursor.close();
-        }
-
 		//Get list of boards this app uses
     	List<TrelloBoard> localBoards = getLocalBoards(app);
     	Log.d("SyncApp", "Got local boards");

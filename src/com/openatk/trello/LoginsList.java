@@ -6,18 +6,17 @@ import java.util.Iterator;
 import java.util.List;
 
 import com.openatk.trello.R;
-import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.database.LoginsTable;
 import com.openatk.trello.internet.App;
 import com.openatk.trello.internet.Login;
 import com.openatk.trello.internet.TrelloOrganization;
 
-
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.app.Activity;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -43,7 +42,8 @@ public class LoginsList extends Activity implements OnClickListener, OnItemClick
 	private LoginsArrayAdapter itemListAdapter = null;
 	
 	DatabaseHandler dbHandler = null;
-	
+    private static final String AUTHORITY = "com.openatk.trello";
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -129,8 +129,8 @@ public class LoginsList extends Activity implements OnClickListener, OnItemClick
 			database.update(LoginsTable.TABLE_NAME, updateValues2, where2, null);
 			dbHandler.close();
 	
-			SharedPreferences prefs = PreferenceManager
-					.getDefaultSharedPreferences(getApplicationContext());
+			SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
+
 			SharedPreferences.Editor editor = prefs.edit();
 			editor.putString("organizationId", item.getOrganizationId().trim());
 			editor.putString("apiKey", item.getApiKey().trim());

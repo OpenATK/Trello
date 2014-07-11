@@ -3,7 +3,6 @@ package com.openatk.trello;
 import java.util.List;
 
 import com.openatk.trello.R;
-import com.openatk.trello.database.AppsTable;
 import com.openatk.trello.database.DatabaseHandler;
 import com.openatk.trello.internet.App;
 import com.openatk.trello.internet.Login;

@@ -23,7 +23,6 @@ public class DatabaseHandler extends SQLiteOpenHelper {
     // Creating tables
     @Override
     public void onCreate(SQLiteDatabase db) {    	
-        AppsTable.onCreate(db);
         LoginsTable.onCreate(db);
         OrganizationMembersTable.onCreate(db);
     }
@@ -31,7 +30,6 @@ public class DatabaseHandler extends SQLiteOpenHelper {
     // Upgrading tables
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-    	AppsTable.onUpgrade(db, oldVersion, newVersion);
     	LoginsTable.onUpgrade(db, oldVersion, newVersion);
     	OrganizationMembersTable.onUpgrade(db, oldVersion, newVersion);
     }

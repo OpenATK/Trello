@@ -32,7 +32,8 @@ public class MainActivity extends Activity implements OnClickListener {
 	private AccountManager mAccountManager;
 	private Account mConnectedAccount;
 	WebView webView = null;
-	
+    private static final String AUTHORITY = "com.openatk.trello";
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -45,7 +46,7 @@ public class MainActivity extends Activity implements OnClickListener {
 		setupAccount.setOnClickListener(this);
 
 		
-		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+		SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
 
 		Boolean setup = prefs.getBoolean("FirstSetup", false);
 		if(setup){
@@ -82,7 +83,7 @@ public class MainActivity extends Activity implements OnClickListener {
                                 String accountName = bnd.getString(AccountManager.KEY_ACCOUNT_NAME);
                                 //mConnectedAccount = new Account(accountName, AccountGeneral.ACCOUNT_TYPE);
                                 //Save the accountname to prefs
-                        		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity.getApplicationContext());
+                        		SharedPreferences prefs = activity.getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
         						SharedPreferences.Editor editor = prefs.edit();
         						Log.d("MainActivity", "Account Name:" + accountName);
         						editor.putString("accountName", accountName); //Temp

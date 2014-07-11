@@ -10,6 +10,7 @@ import com.openatk.trello.internet.TrelloMember;
 
 import android.app.Activity;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -42,7 +43,8 @@ public class MembersList extends Activity implements OnClickListener, OnItemClic
 
 	private boolean loading = false;
 	DatabaseHandler dbHandler = null;
-
+    private static final String AUTHORITY = "com.openatk.trello";
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -52,8 +54,8 @@ public class MembersList extends Activity implements OnClickListener, OnItemClic
 
 		membersList = new ArrayList<TrelloMember>();
 		
-		SharedPreferences prefs = PreferenceManager
-				.getDefaultSharedPreferences(getApplicationContext());
+		SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
+
 		String orgoId = prefs.getString("organizationId", "null");
 		String accountName = prefs.getString("accountName", null);
 		
@@ -105,7 +107,8 @@ public class MembersList extends Activity implements OnClickListener, OnItemClic
 		((MembersArrayAdapter) membersListView.getAdapter()).dataChanged();
 		
 		//Add Members to database
-    	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+		SharedPreferences prefs = getApplicationContext().getSharedPreferences(AUTHORITY, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
+
 		String orgoId = prefs.getString("organizationId", "null");
 		if(orgoId.contentEquals("null") == false){
 			SQLiteDatabase database = dbHandler.getWritableDatabase();
